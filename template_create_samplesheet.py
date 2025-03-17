@@ -11,7 +11,6 @@ while the NFC_DMX.config file must be created manually by the user.
 """
 
 # to do 
-# 1. add container_id to the samples
 # 2. take the base_path from the api call and to not hardcode it!
 
 import sys
@@ -23,7 +22,7 @@ from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
 import csv
 from datetime import datetime
 
-url_params = "token=2q4lKuG9HNJr4bK7W0c3sGeF7xg0x5pdIqnAvnPCmSerzHtHyLheS8yKPnSSP1zmahE5KabOIMuhgl8iL0Yv9nBCbPPvaiXlH35X8H7_t5Hrg0xuELHmI68WgybFQfAfa_erfPUMAUi6-PCdCmgPsYLkr2ilznD-pTDNj656wWBF8YbHbnt0qjxatyjJhBkFnz_C2NTyhjZDCAfI4UVwbfgAAs3CU94Oly-wmNiVx4hBxR12aN1VyF1XqzRzuMxb"
+url_params = "token=2q4lKuG9HNJr4bK7W0c3sGeF7xg0x5pdIqnAvnPCmSerzHtHyLheS8yKPnSSP1zmahE5KabOIMuhgl8iL0Yv9nBCbPPvaiXlH35X8H7_t5Hrg0xuELHmI68WgybFQfAfa_erfPUMAUi6-PCdCmgPsYhwIFlx6SznQQgBGlDEYT-ZEF9TSnm7ooGycmHcGq_2nz_C2NTyhjZDCAfI4UVwbVa_wBspDnhj7x78k4t_TZtBxR12aN1VyF1XqzRzuMxb"
 token, token_data, entity_data, app_data, page_title, session_details, job_link = bfabric_web_apps.process_url_and_token(url_params)
 
 print("Token data:", token_data)
@@ -131,7 +130,7 @@ def create_samplesheet(app_data, samples, rununit, instrument_data, output_file=
             "index":             record["multiplexiddmx"],  # i7 for demultiplexing
             "I5_Index_ID":       record["multiplexid2dmx"], # purely for final CSV documentation
             "index2":            record["multiplexid2dmx"], # i5 for demultiplexing
-            "Sample_Project":    "", #container_id
+            "Sample_Project":    record["container"]["id"],
             "Description":       ""
         }
 
@@ -146,13 +145,12 @@ def create_samplesheet(app_data, samples, rununit, instrument_data, output_file=
 
 
 def create_pipeline_samplesheet_csv(
+    run,
     rununit,
-    run_id: str,
-    base_path: str,
     output_file: str = "pipeline_samplesheet.csv"
 ):
     
-    base_path = base_path + "/" +str(run_id_example)
+    run = run[0]
     rununit_data = rununit[0]
     lanes = rununit_data.get("numberoflanes")
     print("lanes",lanes)
@@ -160,10 +158,10 @@ def create_pipeline_samplesheet_csv(
     rows = []
     for i in range(1,int(lanes)+1):
         rows.append([
-            run_id,
-            f"{base_path}/Samplesheet.csv",
+            run.get("datafolder"), #get rid of the /APPLICATION to have correct format
+            run.get("datafolder") + "Samplesheet.csv",
             str(i),
-            base_path
+            run.get("datafolder")
         ])
     
     # Write the CSV
@@ -211,8 +209,7 @@ run_id_example = "200611_A00789R_0071_BHHVCCDRXX"
 base_path = "/APPLICATION"
 
 create_pipeline_samplesheet_csv(
+    run,
     rununit,
-    run_id=run_id_example,
-    base_path=base_path,
     output_file="pipeline_samplesheet.csv"
     )
