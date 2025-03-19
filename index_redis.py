@@ -269,7 +269,7 @@ def highlight_selected_columns(selected_columns):
     ],
     [Input("Submit", "n_clicks")],
     [
-        State('token', 'data'),
+        State('url', 'search'),
         State("token_data", "data"),
         State("queue", "value"),
         State('samplesheet-table', 'data'),
@@ -278,7 +278,7 @@ def highlight_selected_columns(selected_columns):
     ],
     prevent_initial_call=True
 )
-def run_main_job(n_clicks, token, token_data, queue, table_data, selected_rows, sample_dict):
+def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, sample_dict):
 
     update_csv_bfore_runing_main_job(n_clicks, table_data, selected_rows)
 
@@ -294,7 +294,8 @@ def run_main_job(n_clicks, token, token_data, queue, table_data, selected_rows, 
         "./NFC_DMX.config": NFC_DMC_config_as_bytes
     }
 
-    bash_commands = [
+    bash_commands = ["echo hallo"]
+
     """\
     /home/nfc/.local/bin/nextflow run nf-core/demultiplex \
     -profile docker \
@@ -305,7 +306,7 @@ def run_main_job(n_clicks, token, token_data, queue, table_data, selected_rows, 
     -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
     -r 1.5.4 > /STORAGE/nextflow.log 2>&1 &
     """
-    ]
+
     
     resource_paths = create_resource_paths(sample_dict)
     print("resource_paths", resource_paths)
@@ -314,9 +315,9 @@ def run_main_job(n_clicks, token, token_data, queue, table_data, selected_rows, 
     attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
 
     if queue == "heavy":
-        q('heavy').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
+        q('heavy').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
     else:
-        q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
+        q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
 
 
 # Here we run the app on the specified host and port.
