@@ -145,7 +145,7 @@ def read_file_as_bytes(file_path, max_size_mb=400):
 
 
 
-def create_resource_paths_from_bfabric(sample_dict):
+def create_resource_paths(sample_dict):
     """
     Constructs a dictionary of resource paths (keys) and their corresponding container IDs (values).
 
@@ -165,7 +165,7 @@ def create_resource_paths_from_bfabric(sample_dict):
     Returns:
         dict: A dictionary where keys are the resource paths and values are the corresponding container IDs.
     """
-    base_dir = "./STORAGE/OUTPUT_TEST"
+    base_dir = "/STORAGE/OUTPUT_TEST"
     resource_paths = {}
 
     # Read pipeline_samplesheet.csv to get pipeline rows.

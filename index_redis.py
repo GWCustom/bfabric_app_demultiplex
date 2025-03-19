@@ -24,7 +24,7 @@ from demultiplex_functions import (
     read_file_as_bytes,
     load_samplesheet_data_when_loading_app,
     update_csv_bfore_runing_main_job,
-    create_resource_paths_from_bfabric
+    create_resource_paths
 )
 
 bfabric_web_apps.CONFIG_FILE_PATH = "~/.bfabricpy.yml"
@@ -294,7 +294,7 @@ def run_main_job(n_clicks, token, token_data, queue, table_data, selected_rows, 
         "./NFC_DMX.config": NFC_DMC_config_as_bytes
     }
 
-    bash_commands = ["echo hallo"]
+    bash_commands = [
     """\
     /home/nfc/.local/bin/nextflow run nf-core/demultiplex \
     -profile docker \
@@ -305,14 +305,18 @@ def run_main_job(n_clicks, token, token_data, queue, table_data, selected_rows, 
     -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
     -r 1.5.4 > /STORAGE/nextflow.log 2>&1 &
     """
+    ]
     
-    resource_paths = create_resource_paths_from_bfabric(sample_dict)
+    resource_paths = create_resource_paths(sample_dict)
     print("resource_paths", resource_paths)
     #resource_paths = {"./test.txt": 2220,"./test1.txt": 2220} # The recource path to file or folder as key and the container_id as value.
 
-    attachment_paths = {"./STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
+    attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
 
-    #q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
+    if queue == "heavy":
+        q('heavy').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
+    else:
+        q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
 
 
 # Here we run the app on the specified host and port.
