@@ -16,29 +16,24 @@ from pathlib import Path
 from bfabric_web_apps import run_main_job
 from bfabric_web_apps.utils.redis_queue import q
 import os
+import csv
 import pandas as pd
 from io import StringIO
+from demultiplex_functions import (
+    parse_samplesheet_data_only,
+    read_file_as_bytes,
+    load_samplesheet_data_when_loading_app,
+    update_csv_bfore_runing_main_job,
+    create_resource_paths_from_bfabric
+)
 
 bfabric_web_apps.CONFIG_FILE_PATH = "~/.bfabricpy.yml"
 bfabric_web_apps.DEVELOPER_EMAIL_ADDRESS = "griffin@gwcustom.com"
 bfabric_web_apps.BUG_REPORT_EMAIL_ADDRESS = "gwtools@fgcz.system"
 
-dropdown_options = ['Genomics (project 2220)', 'Proteomics (project 3000)', 'Metabolomics (project 31230)']
-dropdown_values = ['2220', '3000', '31230']
-
 # Here we define the sidebar of the UI, including the clickable components like dropdown and slider. 
 sidebar = [
-    html.P(id="sidebar_text", children="How Many Resources to Create?"),  # Sidebar header text.
-    dcc.Slider(0, 10, 1, value=4, id='example-slider'),  # Slider for selecting a numeric value.
-    html.Br(),
-    html.P(id="sidebar_text_2", children="For Which Internal Unit?"),
-    dcc.Dropdown(
-        options=[{'label': option, 'value': value} for option, value in zip(dropdown_options, dropdown_values)],
-        value=dropdown_options[0],
-        id='example-dropdown'  # Dropdown ID for callback integration.
-    ),
-    html.Br(),
-    html.P(id="sidebar_text_3", children="Submit job to which queue?"),  # Text for the input field.
+    html.P(id="sidebar_text_3", children="Submit job to which queue?"),  # Text for the queue selection.
     dcc.Dropdown(
         options=[
             {'label': 'light', 'value': 'light'},
@@ -48,9 +43,7 @@ sidebar = [
         id='queue'
     ),
     html.Br(),
-    dbc.Input(value='Content of Resources', id='example-input'),  # Text input field.
-    html.Br(),
-    dbc.Button('Submit', id='example-button'),  # Button for user submission.
+    dbc.Button('Submit', id='example-button'),  # Button for submission.
 ]
 
 # here we define the modal that will pop up when the user clicks the submit button.
@@ -99,8 +92,9 @@ app_specific_layout = dbc.Row(
             ),
             width=9,
         ),
+            dcc.Store(id='sample_data', data=[])
     ],
-    style={"margin-top": "0px", "min-height": "40vh"}
+    style={"margin-top": "0px", "min-height": "40vh"},
 )
 
 # Here we define the documentation content for the app.
@@ -153,32 +147,25 @@ def toggle_modal(n1, n2, is_open):
 # This callback updates the UI based on the user's authentication status and the entity data.
 @app.callback(
     [
-        Output('sidebar_text', 'hidden'),
-        Output('example-slider', 'disabled'),
-        Output('example-dropdown', 'disabled'),
-        Output('example-input', 'disabled'),
         Output('example-button', 'disabled'),
         Output('submit-bug-report', 'disabled'),
         Output('Submit', 'disabled'),
         Output('auth-div', 'children'),
     ],
     [
-        Input('example-slider', 'value'),
-        Input('example-dropdown', 'value'),
-        Input('example-input', 'value'),
         Input('token_data', 'data'),
     ],
     [State('entity', 'data')]
 )
-def update_ui(slider_val, dropdown_val, input_val, token_data, entity_data):
+def update_ui(token_data, entity_data):
 
     # Determine sidebar and input states based on token_data and development mode.
     if token_data is None:
-        sidebar_state = (True, True, True, True, True, True, True)
+        sidebar_state = (True, True, True)
     elif not bfabric_web_apps.DEV:
-        sidebar_state = (False, False, False, False, False, False, False)
+        sidebar_state = (False, False, False)
     else:
-        sidebar_state = (True, True, True, True, True, True, True)
+        sidebar_state = (True, True, True)
 
     # Generate content for the auth-div based on authentication and entity data.
     if not entity_data or not token_data:
@@ -228,9 +215,9 @@ def update_ui(slider_val, dropdown_val, input_val, token_data, entity_data):
                     samplesheet_table
                 ],
                 style={
-                    "margin-top": "5vh",
+                    "margin-top": "1vw",
                     "margin-left": "2vw",
-                    "font-size": "15px"
+                    "margin-bottom": "2vw",
                 }
             )
 
@@ -240,71 +227,10 @@ def update_ui(slider_val, dropdown_val, input_val, token_data, entity_data):
     return (*sidebar_state, auth_div_content)
 
 
-# This callback creates workunits and resources based on the user's input, and displays the corresponding alert, based on success or failure.
-@app.callback(
-    [
-        Output("alert-fade-success", "is_open"), 
-        Output("alert-fade-fail", "is_open"), 
-        Output("alert-fade-fail", "children"),
-        Output("refresh-workunits", "children")
-    ],
-    [Input("Submit", "n_clicks")],
-    [
-        State('token', 'data'),
-        State("example-slider", "value"),
-        State("example-dropdown", "value"),
-        State("example-input", "value"),
-        State("token_data", "data"),
-        State("queue", "value")
-    ],
-    prevent_initial_call=True
-)
-def run_main_job(token, n_clicks, slider_val, dropdown_val, input_val, token_data, queue):
 
-    # file_as_bytes = read_file_as_bytes("C:/Users/marc_/Desktop/Test_Pipeline_Run/From/test.csv")
-    samplesheet_as_bytes = read_file_as_bytes("./Samplesheet.csv")
-    pipeline_samplesheet_as_bytes = read_file_as_bytes("./pipeline_samplesheet.csv")
-    NFC_DMC_config_as_bytes = read_file_as_bytes("./NFC_DMX.config")
+# Samplesheet and UI table
 
-    # Define file paths (Remote -> Local)
-    files_as_byte_strings = {
-        "./Samplesheet.csv": samplesheet_as_bytes,
-        "./pipeline_samplesheet.csv": pipeline_samplesheet_as_bytes,
-        "./NFC_DMX.config": NFC_DMC_config_as_bytes
-    }
-
-    bash_commands = [
-    """\
-    /home/nfc/.local/bin/nextflow run nf-core/demultiplex \
-    -profile docker \
-    --input /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/pipeline_samplesheet.csv \
-    --outdir /STORAGE/OUTPUT_TEST \
-    --demultiplexer bcl2fastq \
-    --skip_tools samshee,checkqc \
-    -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
-    -r 1.5.4 > /STORAGE/nextflow.log 2>&1 &
-    """
-    ]
-
-    resource_paths = {"./test.txt": 2220,"./test1.txt": 2220} # The recource path to file or folder as key and the container_id as value.
-
-    attachment_paths = {"./test_report.txt": "test_report.txt", "./another_test_report.txt": "another_test_report.txt"} # The recource path to file or folder as key and the container_id as value.
-
-    q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
-
-
-def read_file_as_bytes(file_path, max_size_mb=400):
-    """Reads any file type and stores it as a byte string in a dictionary."""
-    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)  # Convert bytes to MB
-    if file_size_mb > max_size_mb:
-        raise ValueError(f"File {file_path} exceeds {max_size_mb}MB limit ({file_size_mb:.2f}MB).")
-
-    with open(file_path, "rb") as f:  # Read as bytes
-        file_as_bytes = f.read()
-
-    return file_as_bytes
-
-
+# This function creates the samplesheets when loading the application
 @app.callback(
     Output("samplesheet-table", "data"),
     Output("samplesheet-table", "columns"),
@@ -312,65 +238,11 @@ def read_file_as_bytes(file_path, max_size_mb=400):
     Input("token_data", "data"),
 )
 def load_samplesheet_data(token_data):
-    if not token_data:
-        raise dash.exceptions.PreventUpdate
-    
-    csv_path = "Samplesheet.csv"
-    if not os.path.isfile(csv_path):
-        raise dash.exceptions.PreventUpdate("Samplesheet.csv doesn't exist yet.")
-    
-    df = parse_samplesheet_data_only(csv_path)
-    if df.empty:
-        return [], [], []
-    
-    # Build the DataTable columns such that only these four columns are editable
-    editable_cols = {"index", "index2"}
-    columns = []
-    for col in df.columns:
-        # If the column name is in editable_cols, set editable to True, otherwise False
-        columns.append({
-            "name": col,
-            "id": col,
-            "editable": (col in editable_cols)
-        })
-    
-    data = df.to_dict("records")
-    
-    # By default, all rows are selected
-    all_indices = list(range(len(df)))
-    
-    return data, columns, all_indices
+    return load_samplesheet_data_when_loading_app(token_data)
 
 
 
-def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
-    with open(filepath, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
-    # Locate the [Data] line.
-    data_start_idx = None
-    for i, line in enumerate(lines):
-        if line.strip().startswith("[Data]"):
-            data_start_idx = i
-            break
-
-    if data_start_idx is None:
-        return pd.DataFrame()
-
-    # Read data starting right after [Data]
-    csv_lines = lines[data_start_idx + 1:]  # +1 to include header row
-
-    csv_string = "".join(csv_lines)
-    df = pd.read_csv(StringIO(csv_string))
-
-    # Select only the specific columns
-    columns_to_keep = ["Sample_ID", "Sample_Name", "index", "index2", "Sample_Project"]
-    df = df[columns_to_keep]
-
-    return df
-
-
-
+# This function highlights the selected column
 @app.callback(
     Output('samplesheet-table', 'style_data_conditional'),
     Input('samplesheet-table', 'selected_columns')
@@ -384,75 +256,65 @@ def highlight_selected_columns(selected_columns):
         for col in selected_columns
     ]
 
+
+#Run Pipeline Funciton
+
+# This callback creates workunits and resources based on the user's input, and displays the corresponding alert, based on success or failure.
 @app.callback(
-    Input('Submit', 'n_clicks'),
-    State('samplesheet-table', 'data'),
-    State('samplesheet-table', 'selected_rows')
+    [
+        Output("alert-fade-success", "is_open"), 
+        Output("alert-fade-fail", "is_open"), 
+        Output("alert-fade-fail", "children"),
+        Output("refresh-workunits", "children")
+    ],
+    [Input("Submit", "n_clicks")],
+    [
+        State('token', 'data'),
+        State("token_data", "data"),
+        State("queue", "value"),
+        State('samplesheet-table', 'data'),
+        State('samplesheet-table', 'selected_rows'),
+        State('sample_data', 'data')
+    ],
+    prevent_initial_call=True
 )
-def update_csv(n_clicks, table_data, selected_rows):
-    if not n_clicks:
-        raise dash.exceptions.PreventUpdate
+def run_main_job(n_clicks, token, token_data, queue, table_data, selected_rows, sample_dict):
 
-    # Convert the table data (edited values from the UI) to a DataFrame.
-    updated_df = pd.DataFrame(table_data)
-    if selected_rows is None or len(selected_rows) == 0:
-        # If no rows are selected, use an empty DataFrame.
-        updated_df = updated_df.iloc[0:0]
-    else:
-        # Filter the DataFrame to include only selected rows.
-        updated_df = updated_df.iloc[selected_rows]
+    update_csv_bfore_runing_main_job(n_clicks, table_data, selected_rows)
 
-    # Read the full original CSV file as a list of lines.
-    with open('Samplesheet.csv', 'r', encoding='utf-8') as f:
-        all_lines = f.readlines()
+    # file_as_bytes = read_file_as_bytes("C:/Users/marc_/Desktop/Test_Pipeline_Run/From/test.csv")
+    samplesheet_as_bytes = read_file_as_bytes("./Samplesheet.csv")
+    pipeline_samplesheet_as_bytes = read_file_as_bytes("./pipeline_samplesheet.csv")
+    NFC_DMC_config_as_bytes = read_file_as_bytes("./NFC_DMX.config")
 
-    # Locate the line where the "[Data]" marker is.
-    data_marker_index = None
-    for i, line in enumerate(all_lines):
-        if line.strip().startswith("[Data]"):
-            data_marker_index = i
-            break
-    if data_marker_index is None:
-        return "Error: [Data] section not found in CSV."
+    # Define file paths (Remote -> Local)
+    files_as_byte_strings = {
+        "./Samplesheet.csv": samplesheet_as_bytes,
+        "./pipeline_samplesheet.csv": pipeline_samplesheet_as_bytes,
+        "./NFC_DMX.config": NFC_DMC_config_as_bytes
+    }
 
-    # Ensure there is a header line after the [Data] marker.
-    if len(all_lines) <= data_marker_index + 1:
-        return "Error: Data header line missing in CSV."
+    bash_commands = ["echo hallo"]
+    """\
+    /home/nfc/.local/bin/nextflow run nf-core/demultiplex \
+    -profile docker \
+    --input /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/pipeline_samplesheet.csv \
+    --outdir /STORAGE/OUTPUT_TEST \
+    --demultiplexer bcl2fastq \
+    --skip_tools samshee,checkqc \
+    -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
+    -r 1.5.4 > /STORAGE/nextflow.log 2>&1 &
+    """
+    
+    resource_paths = create_resource_paths_from_bfabric(sample_dict)
+    print("resource_paths", resource_paths)
+    #resource_paths = {"./test.txt": 2220,"./test1.txt": 2220} # The recource path to file or folder as key and the container_id as value.
 
-    # Preserve all lines up to and including the original data header line.
-    # This keeps the [Data] marker and the header (with all the commas) intact.
-    preserved_lines = all_lines[:data_marker_index + 2]
+    attachment_paths = {"./STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
 
-    # Extract the original header columns from the preserved header line.
-    orig_header_line = all_lines[data_marker_index + 1]
-    orig_header_cols = orig_header_line.strip().split(",")
-
-    # Build new data rows aligned with the original header.
-    new_data_rows = []
-    for _, row in updated_df.iterrows():
-        new_row = []
-        for col in orig_header_cols:
-            # If the column exists in the updated data, use its value;
-            # otherwise, leave the field empty.
-            if col in updated_df.columns:
-                new_row.append(str(row[col]))
-            else:
-                new_row.append("")
-        new_data_rows.append(",".join(new_row) + "\n")
-
-    new_data_csv = "".join(new_data_rows)
-
-    # Reassemble the file: preserved header sections + new data rows.
-    new_file_content = "".join(preserved_lines) + new_data_csv
-
-    # Write the reassembled content back to Samplesheet.csv.
-    with open('Samplesheet.csv', 'w', encoding='utf-8', newline='') as f:
-        f.write(new_file_content)
-
-
+    #q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
 
 
 # Here we run the app on the specified host and port.
 if __name__ == "__main__":
     app.run_server(debug=True, port=bfabric_web_apps.PORT, host=bfabric_web_apps.HOST)
-

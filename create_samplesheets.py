@@ -79,6 +79,11 @@ def create_samplesheets(
         flush_logs=False
     )
 
+    print("samples", samples)
+    print("run", run)
+    print("rununit", rununit)
+
+
     # Prepare some metadata
     rununit_data = rununit[0]
     instrument_data = instrument_data[0]
@@ -132,6 +137,8 @@ def create_samplesheets(
         rununit,
         output_file_pipeline_samplesheet
     )
+
+    return list(samples)
 
 
 def create_pipeline_samplesheet_csv(

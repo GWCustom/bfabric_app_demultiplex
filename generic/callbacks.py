@@ -136,15 +136,16 @@ def get_queue_details(token_data, interval):
 
 
 @app.callback(
+    Output('sample_data', 'data'),
     [Input("token_data", "data")],
-    [State("app_data", "data")]
+    [State("app_data", "data")],
 )
-def get_queuecreate_samplesheets_details(token_data, app_data):
+def create_samplesheets_details(token_data, app_data):
     """
     The 'create_samplesheets' function generates the required sample sheet CSV
     files (Samplesheet.csv and pipeline_samplesheet.csv) for the Nextflow pipeline.
     """
-    create_samplesheets(
+    return create_samplesheets(
         token_data,
         app_data,
         output_file_samplesheet="Samplesheet.csv",  # File name for the sample sheet.
