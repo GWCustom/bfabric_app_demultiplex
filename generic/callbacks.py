@@ -26,7 +26,7 @@ from bfabric_web_apps import (
     get_redis_queue_layout
 )
 from dash import html
-
+from create_samplesheets import create_samplesheets
 # Application Initialization
 # ---------------------------
 # Create the Dash app instance.
@@ -133,4 +133,21 @@ def get_queue_details(token_data, interval):
         tuple: Queue details.
     """
     return get_redis_queue_layout()
+
+
+@app.callback(
+    [Input("token_data", "data")],
+    [State("app_data", "data")]
+)
+def get_queuecreate_samplesheets_details(token_data, app_data):
+    """
+    The 'create_samplesheets' function generates the required sample sheet CSV
+    files (Samplesheet.csv and pipeline_samplesheet.csv) for the Nextflow pipeline.
+    """
+    create_samplesheets(
+        token_data,
+        app_data,
+        output_file_samplesheet="Samplesheet.csv",  # File name for the sample sheet.
+        output_file_pipeline_samplesheet="pipeline_samplesheet.csv"   # File name for the pipeline sample sheet.
+    )
 

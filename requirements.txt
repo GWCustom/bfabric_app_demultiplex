@@ -60,3 +60,4 @@ Werkzeug==3.0.6
 zeep==4.3.1
 zipp==3.21.0
 sample_sheet==0.13.0
+pandas==2.2.3

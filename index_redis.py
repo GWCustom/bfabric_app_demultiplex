@@ -6,12 +6,18 @@
 import sys
 sys.path.append("../bfabric-web-apps")
 
-from dash import Input, Output, State, html, dcc
+from dash import Input, Output, State, html, dcc, dash_table, callback, no_update
+import dash.exceptions
 import dash_bootstrap_components as dbc
 import bfabric_web_apps
 from generic.callbacks import app
 from generic.components import no_auth
 from pathlib import Path
+from bfabric_web_apps import run_main_job
+from bfabric_web_apps.utils.redis_queue import q
+import os
+import pandas as pd
+from io import StringIO
 
 bfabric_web_apps.CONFIG_FILE_PATH = "~/.bfabricpy.yml"
 bfabric_web_apps.DEVELOPER_EMAIL_ADDRESS = "griffin@gwcustom.com"
@@ -67,40 +73,35 @@ alerts = html.Div(
 
 # Here we define a Dash layout, which includes the sidebar, and the main content of the app. 
 app_specific_layout = dbc.Row(
-        id="page-content-main",
-        children=[
-            dcc.Loading(alerts), 
-            modal,  # Modal defined earlier.
-            dbc.Col(
-                html.Div(
-                    id="sidebar",
-                    children=sidebar,  # Sidebar content defined earlier.
-                    style={
-                        "border-right": "2px solid #d4d7d9",
-                        "height": "100%",
-                        "padding": "20px",
-                        "font-size": "20px"
-                    }
-                ),
-                width=3,  # Width of the sidebar column.
+    id="page-content-main",
+    children=[
+        dcc.Loading(alerts),
+        modal,
+        dbc.Col(
+            html.Div(
+                id="sidebar",
+                children=sidebar,
+                style={
+                    "border-right": "2px solid #d4d7d9",
+                    "height": "100%",
+                    "padding": "20px",
+                    "font-size": "20px"
+                }
             ),
-            dbc.Col(
-                html.Div(
-                    id="page-content",
-                    children=[
-                        html.Div(id="auth-div")  # Placeholder for `auth-div` to be updated dynamically.
-                    ],
-                    style={
-                        "margin-top": "20vh",
-                        "margin-left": "2vw",
-                        "font-size": "20px"
-                    }
-                ),
-                width=9,  # Width of the main content column.
+            width=3,
+        ),
+        dbc.Col(
+            html.Div(
+                id="page-content",
+                children=[
+                    html.Div(id="auth-div"),
+                ],
             ),
-        ],
-        style={"margin-top": "0px", "min-height": "40vh"}  # Overall styling for the row layout.
-    )
+            width=9,
+        ),
+    ],
+    style={"margin-top": "0px", "min-height": "40vh"}
+)
 
 # Here we define the documentation content for the app.
 documentation_content = [
@@ -181,24 +182,57 @@ def update_ui(slider_val, dropdown_val, input_val, token_data, entity_data):
 
     # Generate content for the auth-div based on authentication and entity data.
     if not entity_data or not token_data:
-        auth_div_content = html.Div(children=no_auth)
+        auth_div_content = html.Div(
+            children=no_auth,
+            style={
+                "margin-top": "20vh",
+                "margin-left": "2vw",
+                "font-size": "20px"
+            }
+        )
     else:
         try:
-            component_data = [
-                html.H1("Component Data:"),
-                html.P(f"Number of Resources to Create: {slider_val}"),
-                html.P(f"Create workunit inside project: {dropdown_val}"),
-                html.P(f"Resource Content: {input_val}")
-            ]
-            entity_details = [
-                html.H1("Entity Data:"),
-                html.P(f"Entity Class: {token_data['entityClass_data']}"),
-                html.P(f"Entity ID: {token_data['entity_id_data']}"),
-                html.P(f"Created By: {entity_data['createdby']}"),
-                html.P(f"Created: {entity_data['created']}"),
-                html.P(f"Modified: {entity_data['modified']}")
-            ]
-            auth_div_content = dbc.Row([dbc.Col(component_data), dbc.Col(entity_details)])
+            samplesheet_table = dash_table.DataTable(
+                id='samplesheet-table',
+                data=[],        
+                columns=[],     
+                # Interactivity
+                editable=True,
+                sort_action="native",
+                sort_mode="multi",
+                column_selectable="single",
+                row_selectable="multi",
+                row_deletable=False,
+                selected_columns=[],
+                selected_rows=[],
+                page_action="native",
+                page_current=0,
+                page_size=15,
+
+                # Styling: remove `margin: '0 auto'` so it's left-aligned
+                style_table={
+                    'overflowX': 'auto',
+                    'maxWidth': '90%'  # or '100%' if you prefer
+                },
+                style_cell={
+                    'minWidth': '60px',
+                    'width': '100px',
+                    'maxWidth': '180px',
+                    'whiteSpace': 'normal',
+                },
+            )
+
+            auth_div_content = html.Div(
+                children=[
+                    html.H4("Samples"),
+                    samplesheet_table
+                ],
+                style={
+                    "margin-top": "5vh",
+                    "margin-left": "2vw",
+                    "font-size": "15px"
+                }
+            )
 
         except Exception as e:
             return (*sidebar_state, html.P(f"Error Logging into B-Fabric: {str}"))
@@ -216,6 +250,7 @@ def update_ui(slider_val, dropdown_val, input_val, token_data, entity_data):
     ],
     [Input("Submit", "n_clicks")],
     [
+        State('token', 'data'),
         State("example-slider", "value"),
         State("example-dropdown", "value"),
         State("example-input", "value"),
@@ -224,31 +259,182 @@ def update_ui(slider_val, dropdown_val, input_val, token_data, entity_data):
     ],
     prevent_initial_call=True
 )
-def create_resources(n_clicks, slider_val, dropdown_val, input_val, token_data, queue):
+def run_main_job(token, n_clicks, slider_val, dropdown_val, input_val, token_data, queue):
 
-    app_id = token_data.get("application_data", None) 
-    container_id = int(dropdown_val)
+    # file_as_bytes = read_file_as_bytes("C:/Users/marc_/Desktop/Test_Pipeline_Run/From/test.csv")
+    samplesheet_as_bytes = read_file_as_bytes("./Samplesheet.csv")
+    pipeline_samplesheet_as_bytes = read_file_as_bytes("./pipeline_samplesheet.csv")
+    NFC_DMC_config_as_bytes = read_file_as_bytes("./NFC_DMX.config")
 
-    if n_clicks:
-        try: 
-            workunit_id = bfabric_web_apps.create_workunit(
-                token_data, "Bfabric App Template", "Bfabric App Template Workunit", app_id, container_id
-            )
-            for i in range(slider_val):
-                file_path = Path(f"resource_example_{i}.txt")
-                file_path.write_text(input_val)
-                try:
-                    # bfabric_web_apps.create_resource(token_data, workunit_id, file_path)
-                    bfabric_web_apps.q(queue).enqueue(bfabric_web_apps.test_job)
+    # Define file paths (Remote -> Local)
+    files_as_byte_strings = {
+        "./Samplesheet.csv": samplesheet_as_bytes,
+        "./pipeline_samplesheet.csv": pipeline_samplesheet_as_bytes,
+        "./NFC_DMX.config": NFC_DMC_config_as_bytes
+    }
 
-                finally: 
-                    file_path.unlink(missing_ok=True)
-            return True, False, None, html.Div()
-        except Exception as e:
-            return False, True, f"Error: Workunit creation failed: {str(e)}", html.Div()
+    bash_commands = [
+    """\
+    /home/nfc/.local/bin/nextflow run nf-core/demultiplex \
+    -profile docker \
+    --input /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/pipeline_samplesheet.csv \
+    --outdir /STORAGE/OUTPUT_TEST \
+    --demultiplexer bcl2fastq \
+    --skip_tools samshee,checkqc \
+    -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
+    -r 1.5.4 > /STORAGE/nextflow.log 2>&1 &
+    """
+    ]
+
+    resource_paths = {"./test.txt": 2220,"./test1.txt": 2220} # The recource path to file or folder as key and the container_id as value.
+
+    attachment_paths = {"./test_report.txt": "test_report.txt", "./another_test_report.txt": "another_test_report.txt"} # The recource path to file or folder as key and the container_id as value.
+
+    q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": token})
+
+
+def read_file_as_bytes(file_path, max_size_mb=400):
+    """Reads any file type and stores it as a byte string in a dictionary."""
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)  # Convert bytes to MB
+    if file_size_mb > max_size_mb:
+        raise ValueError(f"File {file_path} exceeds {max_size_mb}MB limit ({file_size_mb:.2f}MB).")
+
+    with open(file_path, "rb") as f:  # Read as bytes
+        file_as_bytes = f.read()
+
+    return file_as_bytes
+
+
+@app.callback(
+    Output("samplesheet-table", "data"),
+    Output("samplesheet-table", "columns"),
+    Output("samplesheet-table", "selected_rows"),  # new output
+    Input("token_data", "data"),
+)
+def load_samplesheet_data(token_data):
+    if not token_data:
+        raise dash.exceptions.PreventUpdate
+    
+    csv_path = "Samplesheet.csv"
+    if not os.path.isfile(csv_path):
+        raise dash.exceptions.PreventUpdate("Samplesheet.csv doesn't exist yet.")
+    
+    df = parse_samplesheet_data_only(csv_path)
+    if df.empty:
+        return [], [], []
+    
+    # Build the DataTable columns such that only these four columns are editable
+    editable_cols = {"I7_Index_ID", "index", "I5_Index_ID", "index2"}
+    columns = []
+    for col in df.columns:
+        # If the column name is in editable_cols, set editable to True, otherwise False
+        columns.append({
+            "name": col,
+            "id": col,
+            "editable": (col in editable_cols)
+        })
+    
+    data = df.to_dict("records")
+    
+    # By default, all rows are selected
+    all_indices = list(range(len(df)))
+    
+    return data, columns, all_indices
+
+
+
+
+def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
+    with open(filepath, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    
+    # Locate the [Data] line.
+    data_start_idx = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("[Data]"):
+            data_start_idx = i
+            break
+    
+    # If [Data] not found, return empty DataFrame to avoid crashing.
+    if data_start_idx is None:
+        return pd.DataFrame()
+    
+    # The row right after "[Data]" is the actual CSV header line (Sample_ID, Sample_Name, etc)
+    # Then the data rows follow after that.
+    csv_lines = lines[data_start_idx + 1:]  # <-- use +1 here, NOT +2
+    
+    csv_string = "".join(csv_lines)
+    df = pd.read_csv(StringIO(csv_string))
+    
+    # Drop columns that are completely empty (optional)
+    df.dropna(axis=1, how='all', inplace=True)
+    
+    return df
+
+
+@app.callback(
+    Output('samplesheet-table', 'style_data_conditional'),
+    Input('samplesheet-table', 'selected_columns')
+)
+def highlight_selected_columns(selected_columns):
+    return [
+        {
+            'if': {'column_id': col},
+            'background_color': '#D2F3FF'
+        }
+        for col in selected_columns
+    ]
+@app.callback(
+    Input('Submit', 'n_clicks'),
+    State('samplesheet-table', 'data'),
+    State('samplesheet-table', 'selected_rows')
+)
+def update_csv(n_clicks, table_data, selected_rows):
+    if not n_clicks:
+        raise dash.exceptions.PreventUpdate
+
+    # Convert the table data (edited values from the UI) to a DataFrame.
+    updated_df = pd.DataFrame(table_data)
+    if selected_rows is None or len(selected_rows) == 0:
+        # If no rows are selected, use an empty DataFrame.
+        updated_df = updated_df.iloc[0:0]
+    else:
+        # Filter the DataFrame to include only selected rows.
+        updated_df = updated_df.iloc[selected_rows]
+
+    # Read the full original CSV file as a list of lines.
+    with open('Samplesheet.csv', 'r', encoding='utf-8') as f:
+        all_lines = f.readlines()
+
+    # Locate the line where the "[Data]" marker is.
+    data_marker_index = None
+    for i, line in enumerate(all_lines):
+        if line.strip().startswith("[Data]"):
+            data_marker_index = i
+            break
+    if data_marker_index is None:
+        return "Error: [Data] section not found in CSV."
+
+    # Preserve all lines up to (and including) the [Data] marker.
+    preserved_lines = all_lines[:data_marker_index+1]
+
+    # Create a new header line from the UI.
+    # This header comes from the DataTable columns (i.e. the DataFrame's column names).
+    new_header_line = ",".join(updated_df.columns) + "\n"
+
+    # Convert the updated (selected/edited) data to CSV format (without header and index).
+    new_data_csv = updated_df.to_csv(index=False, header=False)
+
+    # Reassemble the file: preserved header sections + new header + new data.
+    new_file_content = "".join(preserved_lines) + new_header_line + new_data_csv
+
+    # Write the reassembled content back to Samplesheet.csv.
+    with open('Samplesheet.csv', 'w', encoding='utf-8') as f:
+        f.write(new_file_content)
+
 
 
 # Here we run the app on the specified host and port.
 if __name__ == "__main__":
-    app.run_server(debug=bfabric_web_apps.DEBUG, port=bfabric_web_apps.PORT, host=bfabric_web_apps.HOST)
+    app.run_server(debug=True, port=bfabric_web_apps.PORT, host=bfabric_web_apps.HOST)
 
