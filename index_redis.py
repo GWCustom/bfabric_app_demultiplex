@@ -384,6 +384,7 @@ def highlight_selected_columns(selected_columns):
         }
         for col in selected_columns
     ]
+
 @app.callback(
     Input('Submit', 'n_clicks'),
     State('samplesheet-table', 'data'),
@@ -415,22 +416,40 @@ def update_csv(n_clicks, table_data, selected_rows):
     if data_marker_index is None:
         return "Error: [Data] section not found in CSV."
 
-    # Preserve all lines up to (and including) the [Data] marker.
-    preserved_lines = all_lines[:data_marker_index+1]
+    # Ensure there is a header line after the [Data] marker.
+    if len(all_lines) <= data_marker_index + 1:
+        return "Error: Data header line missing in CSV."
 
-    # Create a new header line from the UI.
-    # This header comes from the DataTable columns (i.e. the DataFrame's column names).
-    new_header_line = ",".join(updated_df.columns) + "\n"
+    # Preserve all lines up to and including the original data header line.
+    # This keeps the [Data] marker and the header (with all the commas) intact.
+    preserved_lines = all_lines[:data_marker_index + 2]
 
-    # Convert the updated (selected/edited) data to CSV format (without header and index).
-    new_data_csv = updated_df.to_csv(index=False, header=False)
+    # Extract the original header columns from the preserved header line.
+    orig_header_line = all_lines[data_marker_index + 1]
+    orig_header_cols = orig_header_line.strip().split(",")
 
-    # Reassemble the file: preserved header sections + new header + new data.
-    new_file_content = "".join(preserved_lines) + new_header_line + new_data_csv
+    # Build new data rows aligned with the original header.
+    new_data_rows = []
+    for _, row in updated_df.iterrows():
+        new_row = []
+        for col in orig_header_cols:
+            # If the column exists in the updated data, use its value;
+            # otherwise, leave the field empty.
+            if col in updated_df.columns:
+                new_row.append(str(row[col]))
+            else:
+                new_row.append("")
+        new_data_rows.append(",".join(new_row) + "\n")
+
+    new_data_csv = "".join(new_data_rows)
+
+    # Reassemble the file: preserved header sections + new data rows.
+    new_file_content = "".join(preserved_lines) + new_data_csv
 
     # Write the reassembled content back to Samplesheet.csv.
-    with open('Samplesheet.csv', 'w', encoding='utf-8') as f:
+    with open('Samplesheet.csv', 'w', encoding='utf-8', newline='') as f:
         f.write(new_file_content)
+
 
 
 
