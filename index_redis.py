@@ -324,7 +324,7 @@ def load_samplesheet_data(token_data):
         return [], [], []
     
     # Build the DataTable columns such that only these four columns are editable
-    editable_cols = {"I7_Index_ID", "index", "I5_Index_ID", "index2"}
+    editable_cols = {"index", "index2"}
     columns = []
     for col in df.columns:
         # If the column name is in editable_cols, set editable to True, otherwise False
@@ -343,33 +343,32 @@ def load_samplesheet_data(token_data):
 
 
 
-
 def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
     with open(filepath, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-    
+
     # Locate the [Data] line.
     data_start_idx = None
     for i, line in enumerate(lines):
         if line.strip().startswith("[Data]"):
             data_start_idx = i
             break
-    
-    # If [Data] not found, return empty DataFrame to avoid crashing.
+
     if data_start_idx is None:
         return pd.DataFrame()
-    
-    # The row right after "[Data]" is the actual CSV header line (Sample_ID, Sample_Name, etc)
-    # Then the data rows follow after that.
-    csv_lines = lines[data_start_idx + 1:]  # <-- use +1 here, NOT +2
-    
+
+    # Read data starting right after [Data]
+    csv_lines = lines[data_start_idx + 1:]  # +1 to include header row
+
     csv_string = "".join(csv_lines)
     df = pd.read_csv(StringIO(csv_string))
-    
-    # Drop columns that are completely empty (optional)
-    df.dropna(axis=1, how='all', inplace=True)
-    
+
+    # Select only the specific columns
+    columns_to_keep = ["Sample_ID", "Sample_Name", "index", "index2", "Sample_Project"]
+    df = df[columns_to_keep]
+
     return df
+
 
 
 @app.callback(
