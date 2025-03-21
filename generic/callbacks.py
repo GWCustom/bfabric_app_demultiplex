@@ -145,10 +145,11 @@ def create_samplesheets_details(token_data, app_data):
     The 'create_samplesheets' function generates the required sample sheet CSV
     files (Samplesheet.csv and pipeline_samplesheet.csv) for the Nextflow pipeline.
     """
-    return create_samplesheets(
-        token_data,
-        app_data,
-        output_file_samplesheet="Samplesheet.csv",  # File name for the sample sheet.
-        output_file_pipeline_samplesheet="pipeline_samplesheet.csv"   # File name for the pipeline sample sheet.
-    )
+    if token_data:
+        return create_samplesheets(
+            token_data,
+            app_data,
+            output_file_samplesheet="Samplesheet.csv",  # File name for the sample sheet.
+            output_file_pipeline_samplesheet="pipeline_samplesheet.csv"   # File name for the pipeline sample sheet.
+        )
 

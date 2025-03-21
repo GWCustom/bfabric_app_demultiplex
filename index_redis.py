@@ -59,8 +59,8 @@ modal = html.Div([
 # Here are the alerts which will pop up when the user creates workunits 
 alerts = html.Div(
     [
-        dbc.Alert("Success: Workunit created!", color="success", id="alert-fade-success", dismissable=True, is_open=False),
-        dbc.Alert("Error: Workunit creation failed!", color="danger", id="alert-fade-fail", dismissable=True, is_open=False),
+        dbc.Alert("Success: Pipeline started successfully!", color="success", id="alert-fade-success", dismissable=True, is_open=False),
+        dbc.Alert("Error: Pipeline start failed!", color="danger", id="alert-fade-fail", dismissable=True, is_open=False),
     ], style={"margin": "20px"}
 )
 
@@ -280,45 +280,52 @@ def highlight_selected_columns(selected_columns):
 )
 def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, sample_dict):
 
-    update_csv_bfore_runing_main_job(n_clicks, table_data, selected_rows)
+    try: 
+        update_csv_bfore_runing_main_job(n_clicks, table_data, selected_rows)
 
-    # file_as_bytes = read_file_as_bytes("C:/Users/marc_/Desktop/Test_Pipeline_Run/From/test.csv")
-    samplesheet_as_bytes = read_file_as_bytes("./Samplesheet.csv")
-    pipeline_samplesheet_as_bytes = read_file_as_bytes("./pipeline_samplesheet.csv")
-    NFC_DMC_config_as_bytes = read_file_as_bytes("./NFC_DMX.config")
+        # file_as_bytes = read_file_as_bytes("C:/Users/marc_/Desktop/Test_Pipeline_Run/From/test.csv")
+        samplesheet_as_bytes = read_file_as_bytes("./Samplesheet.csv")
+        pipeline_samplesheet_as_bytes = read_file_as_bytes("./pipeline_samplesheet.csv")
+        NFC_DMC_config_as_bytes = read_file_as_bytes("./NFC_DMX.config")
 
-    # Define file paths (Remote -> Local)
-    files_as_byte_strings = {
-        "./Samplesheet.csv": samplesheet_as_bytes,
-        "./pipeline_samplesheet.csv": pipeline_samplesheet_as_bytes,
-        "./NFC_DMX.config": NFC_DMC_config_as_bytes
-    }
+        # Define file paths (Remote -> Local)
+        files_as_byte_strings = {
+            "./Samplesheet.csv": samplesheet_as_bytes,
+            "./pipeline_samplesheet.csv": pipeline_samplesheet_as_bytes,
+            "./NFC_DMX.config": NFC_DMC_config_as_bytes
+        }
 
-    bash_commands = ["echo hallo"]
+        base_dir = "/STORAGE/OUTPUT_TEST"
 
-    """\
-    /home/nfc/.local/bin/nextflow run nf-core/demultiplex \
-    -profile docker \
-    --input /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/pipeline_samplesheet.csv \
-    --outdir /STORAGE/OUTPUT_TEST \
-    --demultiplexer bcl2fastq \
-    --skip_tools samshee,checkqc \
-    -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
-    -r 1.5.4 > /STORAGE/nextflow.log 2>&1 &
-    """
+        bash_commands = [
+        f"""\
+        /home/nfc/.local/bin/nextflow run nf-core/demultiplex \
+        -profile docker \
+        --input /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/pipeline_samplesheet.csv \
+        --outdir {base_dir} \
+        --demultiplexer bcl2fastq \
+        --skip_tools samshee,checkqc \
+        -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
+        -r 1.5.4 > {base_dir}/nextflow.log 2>&1 &
+        """
+        ]
 
+        resource_paths = create_resource_paths(sample_dict, base_dir) # The recource path to file or folder as key and the container_id as value.
+        print("resource_paths", resource_paths)
+
+        attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
+
+        """
+        if queue == "heavy":
+            q('heavy').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
+        else:
+            q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
+        """
+        
+        return True, False, "", "Job submitted successfully"
     
-    resource_paths = create_resource_paths(sample_dict)
-    print("resource_paths", resource_paths)
-    #resource_paths = {"./test.txt": 2220,"./test1.txt": 2220} # The recource path to file or folder as key and the container_id as value.
-
-    attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
-
-    if queue == "heavy":
-        q('heavy').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
-    else:
-        q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
-
+    except Exception as e:
+        return False, True, f"Job submission failed: {str(e)}", "Job submission failed"
 
 # Here we run the app on the specified host and port.
 if __name__ == "__main__":
