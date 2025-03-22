@@ -2,6 +2,8 @@ import pandas as pd
 from io import StringIO
 import os
 import csv
+import dash
+
 
 # Samplesheets
 
@@ -32,10 +34,7 @@ def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
     return df
 
 
-def update_csv_bfore_runing_main_job(n_clicks, table_data, selected_rows):
-
-    if not n_clicks:
-        raise dash.exceptions.PreventUpdate
+def update_csv_bfore_runing_main_job(table_data, selected_rows):
 
     # Convert the table data (edited values from the UI) to a DataFrame.
     updated_df = pd.DataFrame(table_data)
@@ -95,38 +94,31 @@ def update_csv_bfore_runing_main_job(n_clicks, table_data, selected_rows):
 
 
 
-
-def load_samplesheet_data_when_loading_app(token_data):
-    
+def load_samplesheet_data_when_loading_app(token_data, lane_value, csv_list):
     if not token_data:
         raise dash.exceptions.PreventUpdate
-    
-    csv_path = "Samplesheet.csv"
+
+    try:
+        lane_index = int(lane_value)
+    except (ValueError, TypeError):
+        lane_index = 0
+
+    if lane_index >= len(csv_list):
+        raise dash.exceptions.PreventUpdate(f"Lane {lane_value} does not exist.")
+
+    csv_path = csv_list[lane_index]
     if not os.path.isfile(csv_path):
-        raise dash.exceptions.PreventUpdate("Samplesheet.csv doesn't exist yet.")
-    
+        raise dash.exceptions.PreventUpdate(f"{csv_path} doesn't exist yet.")
+
     df = parse_samplesheet_data_only(csv_path)
     if df.empty:
         return [], [], []
-    
-    # Build the DataTable columns such that only these four columns are editable
-    editable_cols = {"index", "index2"}
-    columns = []
-    for col in df.columns:
-        # If the column name is in editable_cols, set editable to True, otherwise False
-        columns.append({
-            "name": col,
-            "id": col,
-            "editable": (col in editable_cols)
-        })
-    
-    data = df.to_dict("records")
-    
-    # By default, all rows are selected
-    all_indices = list(range(len(df)))
-    
-    return data, columns, all_indices
 
+    editable_cols = {"index", "index2"}
+    columns = [{"name": col, "id": col, "editable": (col in editable_cols)} for col in df.columns]
+    data = df.to_dict("records")
+    all_indices = list(range(len(df)))
+    return data, columns, all_indices
 #---------------------------------------------------------------------------------------------------#
 
 # run_main_job
@@ -145,12 +137,9 @@ def read_file_as_bytes(file_path, max_size_mb=400):
 
 
 
-def create_resource_paths(sample_dict, base_dir):
+def create_resource_paths(token_data, base_dir):
     """
     Constructs a dictionary of resource paths (keys) and their corresponding container IDs (values).
-
-    Parameters:
-        sample_dict (list): A list of dictionaries representing samples.
 
     The resource path is built using:
       - A hardcoded base: /STORAGE/OUTPUT_TEST/
@@ -160,7 +149,7 @@ def create_resource_paths(sample_dict, base_dir):
       - The sample ID (from the sample dictionary).
       - A file name built as:
             <Sample_Name>_Sx_<lane_str>_R{read}_001.fastq.gz 
-        for both R1 and R2, where Sx depends on the sample order in sample_dict.
+        for both R1 and R2, where Sx depends on the sample order in samples.
     
     Returns:
         dict: A dictionary where keys are the resource paths and values are the corresponding container IDs.
@@ -175,8 +164,17 @@ def create_resource_paths(sample_dict, base_dir):
         for row in reader:
             pipeline_rows.append(row)
     
-    # Use the provided sample_dict directly.
-    samples = sample_dict
+    L = bfabric_web_apps.get_logger(token_data)
+    wrapper = bfabric_interface.get_wrapper()
+
+    # Read required metadata via the Bfabric API
+    samples = L.logthis(
+        api_call=wrapper.read,
+        endpoint="sample",
+        obj={"runid": token_data["entity_id_data"]},
+        params=None,
+        flush_logs=False
+    )
 
     # Loop through each pipeline row and each sample to build file paths.
     for p_row in pipeline_rows:
