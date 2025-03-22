@@ -61,18 +61,40 @@ sidebar = [
 # ---------------------------
 # Main Layout Definition
 # ---------------------------
+# ---------------------------
+# Main Layout Definition
+# ---------------------------
 app_specific_layout = dbc.Row(
     id="page-content-main",
     children=[
-        dcc.Loading(html.Div(id="alerts-container", children=[
-            dbc.Alert("Success: Pipeline started successfully!", color="success", id="alert-fade-success", dismissable=True, is_open=False),
-            dbc.Alert("Error: Pipeline start failed!", color="danger", id="alert-fade-fail", dismissable=True, is_open=False),
-        ])),
+        dcc.Loading(
+            html.Div(
+                id="alerts-container",
+                children=[
+                    dbc.Alert(
+                        "Success: Pipeline started successfully!",
+                        color="success",
+                        id="alert-fade-success",
+                        dismissable=True,
+                        is_open=False
+                    ),
+                    dbc.Alert(
+                        "Error: Pipeline start failed!",
+                        color="danger",
+                        id="alert-fade-fail",
+                        dismissable=True,
+                        is_open=False
+                    ),
+                ]
+            )
+        ),
         html.Div([
             dbc.Modal([
                 dbc.ModalHeader(dbc.ModalTitle("Ready to Prepare Create Workunits?")),
                 dbc.ModalBody("Are you sure you're ready to create workunits?"),
-                dbc.ModalFooter(dbc.Button("Yes!", id="Submit", className="ms-auto", n_clicks=0)),
+                dbc.ModalFooter(
+                    dbc.Button("Yes!", id="Submit", className="ms-auto", n_clicks=0)
+                ),
             ], id="modal-confirmation", is_open=False),
         ]),
         dbc.Col(
@@ -92,16 +114,26 @@ app_specific_layout = dbc.Row(
             html.Div(
                 id="page-content",
                 children=[
+                    # This is where the unauthenticated message or user UI is inserted:
                     html.Div(id="auth-div"),
+
+                    # IMPORTANT: Add a hidden placeholder DataTable so it always exists
+                    dash_table.DataTable(
+                        id='samplesheet-table',
+                        data=[],
+                        columns=[],
+                        style_table={'display': 'none'},  # Hide initially
+                    )
                 ],
             ),
             width=9,
         ),
-        # Replace the single store with two separate stores.
-        dcc.Store(id='csv_list_store', data=[])        # Holds the list of created CSV filenames
+        dcc.Store(id='csv_list_store', data=[]),
+        dcc.Store(id='previous-lane-store', data=0),
     ],
     style={"margin-top": "0px", "min-height": "40vh"},
 )
+
 
 documentation_content = [
     html.H2("Welcome to Bfabric App Template"),
@@ -244,10 +276,32 @@ def update_samplesheet_title(lane_value):
 # ---------------------------
 @app.callback(
     Output('samplesheet-table', 'style_data_conditional'),
-    Input('samplesheet-table', 'selected_columns')
+    Input('samplesheet-table', 'selected_columns'),
+    prevent_initial_call=True
 )
+
 def highlight_selected_columns(selected_columns):
     return [{'if': {'column_id': col}, 'background_color': '#D2F3FF'} for col in selected_columns]
+
+
+
+
+@app.callback(
+    Output("previous-lane-store", "data"),
+    Input("lane-dropdown", "value"),
+    State("previous-lane-store", "data"),
+    State("samplesheet-table", "data"),
+    State("samplesheet-table", "selected_rows"),
+    State("csv_list_store", "data")
+)
+def save_on_lane_change(new_lane, prev_lane, table_data, selected_rows, csv_list):
+    if prev_lane is not None and csv_list:
+        # Get the CSV path for the lane that is about to be switched out.
+        csv_path = csv_list[prev_lane]
+        update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path)
+    # Return the new lane as the "previous" lane for the next change.
+    return new_lane
+
 
 
 # ---------------------------
@@ -267,16 +321,19 @@ def highlight_selected_columns(selected_columns):
         State('url', 'search'),
         State("token_data", "data"),
         State("queue", "value"),
-        State('samplesheet-table', 'data'),
-        State('samplesheet-table', 'selected_rows'),
+        State('samplesheet-table', "data"),
+        State('samplesheet-table', "selected_rows"),
+        State("lane-dropdown", "value"),
+        State("csv_list_store", "data")
     ],
     prevent_initial_call=True
 )
-def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows):
+def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, lane_val, csv_list):
+    try:
+        # Save current lane's table to its CSV file.
+        csv_path = csv_list[lane_val]
+        update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path)
 
-
-    try: 
-        update_csv_bfore_runing_main_job(table_data, selected_rows)
 
         # file_as_bytes = read_file_as_bytes("C:/Users/marc_/Desktop/Test_Pipeline_Run/From/test.csv")
         samplesheet_as_bytes = read_file_as_bytes("./Samplesheet.csv")

@@ -34,19 +34,16 @@ def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
     return df
 
 
-def update_csv_bfore_runing_main_job(table_data, selected_rows):
-
+def update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path):
     # Convert the table data (edited values from the UI) to a DataFrame.
     updated_df = pd.DataFrame(table_data)
     if selected_rows is None or len(selected_rows) == 0:
-        # If no rows are selected, use an empty DataFrame.
         updated_df = updated_df.iloc[0:0]
     else:
-        # Filter the DataFrame to include only selected rows.
         updated_df = updated_df.iloc[selected_rows]
 
-    # Read the full original CSV file as a list of lines.
-    with open('Samplesheet.csv', 'r', encoding='utf-8') as f:
+    # Read the full original CSV file as a list of lines using the provided path.
+    with open(csv_path, 'r', encoding='utf-8') as f:
         all_lines = f.readlines()
 
     # Locate the line where the "[Data]" marker is.
@@ -63,10 +60,9 @@ def update_csv_bfore_runing_main_job(table_data, selected_rows):
         return "Error: Data header line missing in CSV."
 
     # Preserve all lines up to and including the original data header line.
-    # This keeps the [Data] marker and the header (with all the commas) intact.
     preserved_lines = all_lines[:data_marker_index + 2]
 
-    # Extract the original header columns from the preserved header line.
+    # Extract the original header columns.
     orig_header_line = all_lines[data_marker_index + 1]
     orig_header_cols = orig_header_line.strip().split(",")
 
@@ -75,8 +71,6 @@ def update_csv_bfore_runing_main_job(table_data, selected_rows):
     for _, row in updated_df.iterrows():
         new_row = []
         for col in orig_header_cols:
-            # If the column exists in the updated data, use its value;
-            # otherwise, leave the field empty.
             if col in updated_df.columns:
                 new_row.append(str(row[col]))
             else:
@@ -84,13 +78,12 @@ def update_csv_bfore_runing_main_job(table_data, selected_rows):
         new_data_rows.append(",".join(new_row) + "\n")
 
     new_data_csv = "".join(new_data_rows)
-
-    # Reassemble the file: preserved header sections + new data rows.
     new_file_content = "".join(preserved_lines) + new_data_csv
 
-    # Write the reassembled content back to Samplesheet.csv.
-    with open('Samplesheet.csv', 'w', encoding='utf-8', newline='') as f:
+    # Write the reassembled content back to the CSV file.
+    with open(csv_path, 'w', encoding='utf-8', newline='') as f:
         f.write(new_file_content)
+
 
 
 
