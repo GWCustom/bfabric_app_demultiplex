@@ -15,7 +15,7 @@ Adapter,CTGTCTCTTATACACATCT,,,,,,,,,,
 ,,,,,,,,,,,
 [Data],,,,,,,,,,,
 Sample_ID,Sample_Name,Sample_Plate,Sample_Well,Index_Plate,Index_Plate_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
-893293,Run_1910_227,,,,,,test,,CACCTGTTGC,37482,
+893293,Run_1910_227,,,,,,CAGCGGTAGA,,CACCTGTTGC,37482,
 893289,Run_1910_223,,,,,,ACATGAGTGA,,AGCTAAGCGG,37482,
 893287,Run_1910_221,,,,,,TATAACAGCT,,TTATACGCGA,37482,
 893283,Run_1910_217,,,,,,GCTCTTAACT,,GGTGGACGTG,37482,

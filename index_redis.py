@@ -330,22 +330,25 @@ def save_on_lane_change(new_lane, prev_lane, table_data, selected_rows, csv_list
 )
 def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, lane_val, csv_list):
     try:
-        # Save current lane's table to its CSV file.
+        # 1. Update the selected lane CSV with the user edits.
         csv_path = csv_list[lane_val]
         update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path)
 
+        # 2. Prepare the final dictionary of files.
+        files_as_byte_strings = {}
 
-        # file_as_bytes = read_file_as_bytes("C:/Users/marc_/Desktop/Test_Pipeline_Run/From/test.csv")
-        samplesheet_as_bytes = read_file_as_bytes("./Samplesheet.csv")
-        pipeline_samplesheet_as_bytes = read_file_as_bytes("./pipeline_samplesheet.csv")
-        NFC_DMC_config_as_bytes = read_file_as_bytes("./NFC_DMX.config")
+        # Loop through all lane sample sheets and add them:
+        for sheet_path in csv_list:
+            key = f"./{os.path.basename(sheet_path)}"  # e.g. "./Samplesheet_lane_1.csv"
+            files_as_byte_strings[key] = read_file_as_bytes(sheet_path)
 
-        # Define file paths (Remote -> Local)
-        files_as_byte_strings = {
-            "./Samplesheet.csv": samplesheet_as_bytes,
-            "./pipeline_samplesheet.csv": pipeline_samplesheet_as_bytes,
-            "./NFC_DMX.config": NFC_DMC_config_as_bytes
-        }
+        # 3. Add pipeline_samplesheet.csv and the NFC_DMX.config
+        files_as_byte_strings["./pipeline_samplesheet.csv"] = read_file_as_bytes("./pipeline_samplesheet.csv")
+        files_as_byte_strings["./NFC_DMX.config"]          = read_file_as_bytes("./NFC_DMX.config")
+
+        for key in files_as_byte_strings:
+            print("tesssssssssssssssssssssssssssssssssssssssssssst", key)
+
 
         base_dir = "/STORAGE/OUTPUT_TEST"
 

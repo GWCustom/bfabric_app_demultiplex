@@ -1,3 +1,8 @@
+import sys
+sys.path.append("../bfabric-web-apps")
+
+import bfabric_web_apps
+from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
 import pandas as pd
 from io import StringIO
 import os
