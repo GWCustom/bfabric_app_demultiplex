@@ -330,12 +330,17 @@ def save_on_lane_change(new_lane, prev_lane, table_data, selected_rows, csv_list
 )
 def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, lane_val, csv_list):
     try:
+
         # 1. Update the selected lane CSV with the user edits.
-        csv_path = csv_list[lane_val]
-        update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path)
+        if lane_val:
+            csv_path = csv_list[lane_val]
+
+            update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path)
 
         # 2. Prepare the final dictionary of files.
         files_as_byte_strings = {}
+
+        
 
         # Loop through all lane sample sheets and add them:
         for sheet_path in csv_list:
@@ -345,10 +350,6 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         # 3. Add pipeline_samplesheet.csv and the NFC_DMX.config
         files_as_byte_strings["./pipeline_samplesheet.csv"] = read_file_as_bytes("./pipeline_samplesheet.csv")
         files_as_byte_strings["./NFC_DMX.config"]          = read_file_as_bytes("./NFC_DMX.config")
-
-        for key in files_as_byte_strings:
-            print("tesssssssssssssssssssssssssssssssssssssssssssst", key)
-
 
         base_dir = "/STORAGE/OUTPUT_TEST"
 
@@ -370,13 +371,11 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 
         attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
 
-        """
         if queue == "heavy":
             q('heavy').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
         else:
             q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
-        """
-        
+
         return True, False, "", "Job submitted successfully"
     
     except Exception as e:

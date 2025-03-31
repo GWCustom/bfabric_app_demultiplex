@@ -40,7 +40,8 @@ def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
 
 
 def update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path):
-    # Convert the table data (edited values from the UI) to a DataFrame.
+    # Convert the table data (edited values from the UI) to a DataFrame. 
+
     updated_df = pd.DataFrame(table_data)
     if selected_rows is None or len(selected_rows) == 0:
         updated_df = updated_df.iloc[0:0]
@@ -134,23 +135,64 @@ def read_file_as_bytes(file_path, max_size_mb=400):
     return file_as_bytes
 
 
+def parse_samples_csv(file_path):
+    """
+    Parses a sample CSV file that includes a [Data] section.
+    
+    The function skips header sections until it reaches the "[Data]" marker.
+    The row immediately following "[Data]" is assumed to be the header for the sample data.
+    
+    Returns:
+        list: A list of dictionaries, each representing a sample.
+    """
+    samples = []
+    with open(file_path, newline='') as f:
+        lines = f.readlines()
+
+    # Find the index of the [Data] section.
+    data_index = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("[Data]"):
+            data_index = i
+            break
+
+    if data_index is None:
+        raise ValueError(f"No [Data] section found in file: {file_path}")
+
+    # The header row is the next line after the [Data] marker.
+    header = lines[data_index + 1].strip().split(',')
+    # Data rows start after the header.
+    for line in lines[data_index + 2:]:
+        if not line.strip():
+            continue
+        row = line.strip().split(',')
+        if len(row) < len(header):
+            continue
+        sample_data = dict(zip(header, row))
+        samples.append(sample_data)
+    return samples
 
 def create_resource_paths(token_data, base_dir):
     """
-    Constructs a dictionary of resource paths (keys) and their corresponding container IDs (values).
-
-    The resource path is built using:
-      - A hardcoded base: /STORAGE/OUTPUT_TEST/
-      - The pipeline ID from pipeline_samplesheet.csv.
-      - The lane (formatted as L001, L002, etc.) from pipeline_samplesheet.csv.
-      - The container ID (from the sample dictionary).
-      - The sample ID (from the sample dictionary).
-      - A file name built as:
-            <Sample_Name>_Sx_<lane_str>_R{read}_001.fastq.gz 
-        for both R1 and R2, where Sx depends on the sample order in samples.
+    Constructs a dictionary of resource paths (keys) and their corresponding container IDs (values)
+    using data from pipeline_samplesheet.csv and sample CSV files.
+    
+    Process:
+      - Reads pipeline_samplesheet.csv to obtain pipeline rows.
+      - For each pipeline row, it:
+          • Determines the formatted lane string (e.g. L001, L002, etc.).
+          • Extracts the samplesheet's basename from the pipeline row.
+          • Checks if the samplesheet is among the provided csv_list.
+          • Parses the samples CSV file to obtain sample metadata.
+          • Enumerates the samples to assign an order (S1, S2, …).
+          • Uses the Sample_Project field as the container ID.
+          • Constructs file paths for both R1 and R2 reads:
+                <Sample_Name>_Sx_<lane_str>_R{read}_001.fastq.gz
+      - The full resource path is built as:
+            <base_dir>/<pipeline_id>/<lane_str>/<container_id>/<sample_id>/<file_name>
     
     Returns:
-        dict: A dictionary where keys are the resource paths and values are the corresponding container IDs.
+        dict: Keys are resource paths and values are the corresponding container IDs.
     """
     resource_paths = {}
 
@@ -161,33 +203,27 @@ def create_resource_paths(token_data, base_dir):
         reader = csv.DictReader(f)
         for row in reader:
             pipeline_rows.append(row)
-    
-    L = bfabric_web_apps.get_logger(token_data)
-    wrapper = bfabric_interface.get_wrapper()
 
-    # Read required metadata via the Bfabric API
-    samples = L.logthis(
-        api_call=wrapper.read,
-        endpoint="sample",
-        obj={"runid": token_data["entity_id_data"]},
-        params=None,
-        flush_logs=False
-    )
-
-    # Loop through each pipeline row and each sample to build file paths.
+    # Process each pipeline row.
     for p_row in pipeline_rows:
         pipeline_id = p_row["id"]
         lane = p_row["lane"]
-        # Format lane as L001, L002, etc.
-        lane_str = f"L{int(lane):03d}"
+        lane_str = f"L{int(lane):03d}"  # Format lane as L001, L002, etc.
         
-        # Use enumerate to assign sample order starting at 1.
+        # Get the basename of the samplesheet from the pipeline row.
+        samplesheet_path = p_row["samplesheet"]
+        samplesheet_basename = os.path.basename(samplesheet_path)
+
+        # Parse the samples CSV file to obtain sample metadata.
+        samples = parse_samples_csv(samplesheet_basename)
+
+        # Enumerate samples to assign sample order (S1, S2, ...).
         for idx, sample in enumerate(samples, start=1):
-            sample_id = sample["id"]
-            sample_name = sample["name"]
-            container_id = sample["container"]["id"]
-            
-            # Construct sample identifier based on order (S1, S2, ...)
+            sample_id = sample["Sample_ID"]
+            sample_name = sample["Sample_Name"]
+            # Use the Sample_Project field as container_id.
+            container_id = sample["Sample_Project"]
+
             sample_identifier = f"S{idx}"
             
             # Create file paths for both R1 and R2.
@@ -195,5 +231,5 @@ def create_resource_paths(token_data, base_dir):
                 file_name = f"{sample_name}_{sample_identifier}_{lane_str}_{read}_001.fastq.gz"
                 full_path = f"{base_dir}/{pipeline_id}/{lane_str}/{container_id}/{sample_id}/{file_name}"
                 resource_paths[full_path] = container_id
-                
+
     return resource_paths
