@@ -168,6 +168,6 @@ Dockerfile
 resource_example*
 
 
-# Ignore samplesheets
+# Nextflow Samplesheets
 Samplesheet_lane_*
 pipeline_samplesheet.csv

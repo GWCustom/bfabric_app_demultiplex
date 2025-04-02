@@ -1,40 +1,50 @@
-# ---------------------------
-# Modified create_samplesheets.py
-# ---------------------------
+"""
+Module: create_samplesheets
+Description:
+    This module provides functionality for creating lane-specific sample sheets for mRNA ligation prep,
+    as well as generating a companion pipeline_samplesheet.csv for Nextflow usage.
+    
+    The main functions include:
+      - create_samplesheets: Queries necessary metadata and creates individual samplesheets for each lane.
+      - create_pipeline_samplesheet_csv: Generates a CSV that maps lanes to their samplesheet file paths.
+      - manipulate_date_format: Reformats a datetime string to a simplified date format.
+"""
+
 import sys
 import csv
 import os
 from datetime import datetime
 
+# Append relative path to locate bfabric-web-apps package
 sys.path.append("../bfabric-web-apps")
 
 import bfabric_web_apps
 from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
 from sample_sheet import SampleSheet, Sample
 
-def create_samplesheets(
-    token_data,
-    app_data,
-    output_file_pipeline_samplesheet="pipeline_samplesheet.csv"
-):
+
+def create_samplesheets(token_data, app_data, output_file_pipeline_samplesheet="pipeline_samplesheet.csv"):
     """
-    Create lane-specific sample sheets (mRNA ligation prep) and a pipeline_samplesheet.csv.
+    Create lane-specific sample sheets and a pipeline_samplesheet.csv.
     
     Steps:
       1. Query metadata for run, rununit, and instrument.
-      2. For each lane (from rununitlane), fetch the lane-specific sample IDs and details.
+      2. For each lane in the rununit, fetch lane-specific sample IDs and details.
       3. Create a SampleSheet for each lane and write it to a file (e.g. Samplesheet_lane_1.csv).
-      4. Create a companion pipeline_samplesheet.csv.
+      4. Create a companion pipeline_samplesheet.csv that maps lanes to samplesheet paths.
+    
+    Parameters:
+        token_data: Authentication and metadata token, must include "entity_id_data".
+        app_data: Application metadata, expected to contain the key "name".
+        output_file_pipeline_samplesheet: Filename for the pipeline samplesheet CSV.
     
     Returns:
-      tuple: (last_lane_samples, created_csv_files)
-             - last_lane_samples: list of sample details from the last processed lane (as before)
-             - created_csv_files: list of lane-specific CSV filenames (excluding pipeline_samplesheet.csv)
+        A list of filenames for lane-specific CSV samplesheets (excluding pipeline_samplesheet.csv).
     """
     L = bfabric_web_apps.get_logger(token_data)
     wrapper = bfabric_interface.get_wrapper()
 
-    # Get run and rununit metadata using token_data "entity_id_data"
+    # Query run and rununit metadata using token_data "entity_id_data"
     run = L.logthis(
         api_call=wrapper.read,
         endpoint="run",
@@ -48,7 +58,7 @@ def create_samplesheets(
         flush_logs=False
     )
 
-    # Get instrument data
+    # Retrieve instrument data
     instrument_id = rununit[0]["instrument"]["id"]
     instrument_data = L.logthis(
         api_call=wrapper.read,
@@ -60,13 +70,13 @@ def create_samplesheets(
     rununit_data = rununit[0]
     instrument_data = instrument_data[0]
 
-    # Get all lane IDs from rununitlane field of rununit_data
+    # Extract lane IDs from rununit_data's "rununitlane" field
     lane_ids = [str(lane["id"]) for lane in rununit_data.get("rununitlane", [])]
     if not lane_ids:
         print("No lanes found in rununit data.")
-        return None, []
-    
-    # Get lane objects in one call
+        return []
+
+    # Retrieve lane objects in a single call
     lane_data_list = L.logthis(
         api_call=wrapper.read,
         endpoint="rununitlane",
@@ -74,19 +84,17 @@ def create_samplesheets(
         flush_logs=False
     )
 
-    # Dictionary to store lane number to samplesheet file mapping
-    lane_samplesheet_files = {}
-    last_lane_samples = []  # This will hold the samples from the last processed lane
+    lane_samplesheet_files = {}  # Mapping from lane number to samplesheet filename
 
-    # Process each lane and create its samplesheet
+    # Process each lane and create its respective samplesheet
     for idx, lane in enumerate(lane_data_list):
         lane_number = idx + 1
         lane_sample_ids = [str(s["id"]) for s in lane.get("sample", [])]
         if not lane_sample_ids:
-            print(f"Lane {lane_number} does not have any assigned samples.")
+            print("Lane {} does not have any assigned samples.".format(lane_number))
             continue
 
-        # Fetch full sample details (batch if necessary)
+        # Fetch full sample details; if more than 100 samples, fetch in batches
         lane_samples = []
         if len(lane_sample_ids) < 100:
             lane_samples = L.logthis(
@@ -104,10 +112,10 @@ def create_samplesheets(
                     flush_logs=False
                 )
 
-        # Create a new SampleSheet object for this lane
+        # Create a new SampleSheet object for the current lane
         ss = SampleSheet()
         ss.Header["IEMFileVersion"] = 5
-        ss.Header["Experiment Name"] = f"{rununit_data.get('name')} - Lane {lane_number}"
+        ss.Header["Experiment Name"] = "{} - Lane {}".format(rununit_data.get("name"), lane_number)
         ss.Header["Date"] = manipulate_date_format(rununit_data.get("created"))
         ss.Header["Workflow"] = "GenerateFASTQ"
         ss.Header["Application"] = app_data.get("name")
@@ -115,6 +123,7 @@ def create_samplesheets(
         ss.Reads = [76, 76]
         ss.Settings["Adapter"] = "CTGTCTCTTATACACATCT"
 
+        # Add each sample record to the samplesheet
         for record in lane_samples:
             sample_dict = {
                 "Sample_ID": record["id"],
@@ -132,30 +141,29 @@ def create_samplesheets(
             }
             ss.add_sample(Sample(sample_dict))
 
-        # Write lane-specific samplesheet
-        lane_sheet_filename = f"Samplesheet_lane_{lane_number}.csv"
-        with open(lane_sheet_filename, "w", newline="") as handle:
+        # Write the lane-specific samplesheet to a CSV file
+        lane_sheet_filename = "Samplesheet_lane_{}.csv".format(lane_number)
+        with open(lane_sheet_filename, "w+", newline="") as handle:
             ss.write(handle)
-        print(f"Samplesheet for lane {lane_number} written to {lane_sheet_filename}")
+        print("Samplesheet for lane {} written to {}".format(lane_number, lane_sheet_filename))
         lane_samplesheet_files[lane_number] = lane_sheet_filename
 
-        # Store samples from this lane (current behavior)
-        last_lane_samples = lane_samples
-
-    # Create the pipeline_samplesheet.csv (this file is not included in the returned list)
+    # Generate the pipeline_samplesheet.csv (not included in the returned list)
     create_pipeline_samplesheet_csv(run[0], rununit_data, lane_samplesheet_files, output_file_pipeline_samplesheet)
-    
     return list(lane_samplesheet_files.values())
 
-def create_pipeline_samplesheet_csv(
-    run,
-    rununit_data,
-    lane_samplesheet_files,
-    output_file
-):
+
+def create_pipeline_samplesheet_csv(run, rununit_data, lane_samplesheet_files, output_file):
     """
     Create the pipeline_samplesheet.csv for Nextflow usage.
-    This CSV has 4 columns: id, samplesheet, lane, flowcell.
+    
+    The generated CSV contains four columns: id, samplesheet, lane, flowcell.
+    
+    Parameters:
+        run: Run metadata that includes the datafolder path.
+        rununit_data: Rununit metadata.
+        lane_samplesheet_files: Mapping of lane numbers to their samplesheet filenames.
+        output_file: The output filename for the pipeline samplesheet CSV.
     """
     run_id = os.path.basename(run.get("datafolder"))
     rows = []
@@ -163,16 +171,23 @@ def create_pipeline_samplesheet_csv(
         full_sheet_path = os.path.join(run.get("datafolder"), sheet_file)
         rows.append([run_id, full_sheet_path, str(lane_number), run.get("datafolder")])
 
-    with open(output_file, mode="+w", newline="") as csvfile:
+    with open(output_file, mode="w+", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["id", "samplesheet", "lane", "flowcell"])
         writer.writerows(rows)
-    print(f"pipeline_samplesheet.csv written to: {output_file}")
+    print("pipeline_samplesheet.csv written to: {}".format(output_file))
+
 
 def manipulate_date_format(original_str):
     """
-    Convert date strings from 'YYYY-mm-dd HH:MM:SS' to 'M/D/YYYY'
-    (dropping leading zeros from the month/day).
+    Convert a datetime string from 'YYYY-mm-dd HH:MM:SS' to 'M/D/YYYY',
+    removing any leading zeros from the month and day.
+    
+    Parameters:
+        original_str: A date string in the format 'YYYY-mm-dd HH:MM:SS'.
+    
+    Returns:
+        A reformatted date string in the format 'M/D/YYYY'.
     """
     dt_obj = datetime.strptime(original_str, "%Y-%m-%d %H:%M:%S")
-    return f"{dt_obj.month}/{dt_obj.day}/{dt_obj.year}"
+    return "{}/{}/{}".format(dt_obj.month, dt_obj.day, dt_obj.year)

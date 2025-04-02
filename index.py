@@ -42,7 +42,7 @@ sidebar = [
     dcc.Dropdown(
         id="lane-dropdown",
         options=[],   # Options will be updated dynamically based on created CSV files
-        value=0,      # Default to the first lane
+        value=None,      # Default to the first lane
     ),
     html.Br(),
     html.P(id="sidebar_text_3", children="Submit job to which queue?"),
@@ -181,7 +181,7 @@ def toggle_modal(n1, n2, is_open):
         Output('auth-div', 'children'),
     ],
     [Input('token_data', 'data')],
-    [State('entity', 'data')]
+    [State('entity', 'data'),]
 )
 def update_ui(token_data, entity_data):
     if token_data is None:
@@ -196,6 +196,7 @@ def update_ui(token_data, entity_data):
             children=no_auth,
             style={"margin-top": "20vh", "margin-left": "2vw", "font-size": "20px"}
         )
+
     else:
         try:
             samplesheet_table = dash_table.DataTable(
@@ -218,9 +219,18 @@ def update_ui(token_data, entity_data):
             )
             auth_div_content = html.Div(
                 children=[
-                    html.H4(id="samplesheet-title", children="Samples"),
+                    html.H4(
+                        id="samplesheet-title",
+                        children="",
+                        style={
+                            "fontSize": "18px",       # Smaller text size
+                            "marginTop": "50px",      # A bit lower
+                            "textAlign": "left"     # Center aligned
+                        }
+                    ),
                     samplesheet_table
-                ],
+                ]
+                ,
                 style={"margin-top": "1vw", "margin-left": "2vw", "margin-bottom": "2vw"}
             )
         except Exception as e:
@@ -233,8 +243,8 @@ def update_ui(token_data, entity_data):
 # ---------------------------
 @app.callback(
     Output("lane-dropdown", "options"),
-    Output("lane-dropdown", "value"),
-    Input("csv_list_store", "data")
+    Input("csv_list_store", "data"),
+    prevent_initial_call=True
 )
 def update_lane_dropdown_options(csv_list):
     # csv_list is expected to be a list of CSV filenames.
@@ -242,19 +252,18 @@ def update_lane_dropdown_options(csv_list):
         dropdown_options = [{"label": "Lane 1", "value": 0}]
     else:
         dropdown_options = [{"label": f"Lane {i+1}", "value": i} for i in range(len(csv_list))]
-    value = dropdown_options[0]["value"]
 
-    return dropdown_options, value
-# ---------------------------
+        return dropdown_options
+
 # Callback: Load Samplesheet Data Based on Token, Lane Selection, and Created CSV Files
 # ---------------------------
 @app.callback(
     Output("samplesheet-table", "data"),
     Output("samplesheet-table", "columns"),
     Output("samplesheet-table", "selected_rows"),
-    Input("token_data", "data"),
+    State("token_data", "data"),
     Input("lane-dropdown", "value"),
-    Input("csv_list_store", "data")  # Use the dynamically created CSV list
+    Input("csv_list_store", "data"),  # Use the dynamically created CSV list,
 )
 def load_samplesheet_data(token_data, lane_value, csv_list):
     if not csv_list or not isinstance(csv_list, list):
@@ -267,6 +276,7 @@ def load_samplesheet_data(token_data, lane_value, csv_list):
 @app.callback(
     Output("samplesheet-title", "children"),
     Input("lane-dropdown", "value"),
+    prevent_initial_call=True
 )
 def update_samplesheet_title(lane_value):
     try:
@@ -296,7 +306,8 @@ def highlight_selected_columns(selected_columns):
     State("previous-lane-store", "data"),
     State("samplesheet-table", "data"),
     State("samplesheet-table", "selected_rows"),
-    State("csv_list_store", "data")
+    State("csv_list_store", "data"),
+    prevent_initial_call=True
 )
 def save_on_lane_change(new_lane, prev_lane, table_data, selected_rows, csv_list):
     if prev_lane is not None and csv_list:
