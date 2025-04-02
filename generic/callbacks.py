@@ -142,16 +142,15 @@ def get_queue_details(token_data, interval):
 )
 def create_samplesheets_details(token_data, app_data):
     """
-    Generates the required samplesheet CSV files and returns two outputs:
-    - last_lane_samples: sample details from the last processed lane.
+    Generates the required samplesheet CSV files and returns as output:
     - csv_list: list of created CSV filenames (excluding the pipeline_samplesheet).
     """
     if token_data:
-        last_lane_samples, csv_list = create_samplesheets(
+        csv_list = create_samplesheets(
             token_data,
             app_data,
             output_file_pipeline_samplesheet="pipeline_samplesheet.csv"
         )
-        return last_lane_samples, csv_list
+        return csv_list
 
 

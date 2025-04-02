@@ -41,7 +41,6 @@ def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
 
 def update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path):
     # Convert the table data (edited values from the UI) to a DataFrame. 
-
     updated_df = pd.DataFrame(table_data)
     if selected_rows is None or len(selected_rows) == 0:
         updated_df = updated_df.iloc[0:0]
@@ -96,6 +95,9 @@ def update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path):
 def load_samplesheet_data_when_loading_app(token_data, lane_value, csv_list):
     if not token_data:
         raise dash.exceptions.PreventUpdate
+    
+    if lane_value == None:
+         return [], [], []
 
     try:
         lane_index = int(lane_value)
