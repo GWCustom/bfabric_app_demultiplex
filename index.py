@@ -371,11 +371,7 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 
         attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
 
-        if queue == "heavy":
-            q('heavy').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
-        else:
-            q('light').enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
-
+        q(queue).enqueue(run_main_job, kwargs={"files_as_byte_strings": files_as_byte_strings, "bash_commands": bash_commands, "resource_paths": resource_paths, "attachment_paths": attachment_paths, "token": url_params})
         return True, False, "", "Job submitted successfully"
     
     except Exception as e:
