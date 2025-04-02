@@ -233,14 +233,18 @@ def update_ui(token_data, entity_data):
 # ---------------------------
 @app.callback(
     Output("lane-dropdown", "options"),
+    Output("lane-dropdown", "value"),
     Input("csv_list_store", "data")
 )
 def update_lane_dropdown_options(csv_list):
     # csv_list is expected to be a list of CSV filenames.
     if not csv_list or not isinstance(csv_list, list):
-        return [{"label": "Lane 1", "value": 0}]
-    return [{"label": f"Lane {i+1}", "value": i} for i in range(len(csv_list))]
+        dropdown_options = [{"label": "Lane 1", "value": 0}]
+    else:
+        dropdown_options = [{"label": f"Lane {i+1}", "value": i} for i in range(len(csv_list))]
+    value = dropdown_options[0]["value"]
 
+    return dropdown_options, value
 # ---------------------------
 # Callback: Load Samplesheet Data Based on Token, Lane Selection, and Created CSV Files
 # ---------------------------
