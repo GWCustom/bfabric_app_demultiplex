@@ -163,7 +163,7 @@ def create_pipeline_samplesheet_csv(
         full_sheet_path = os.path.join(run.get("datafolder"), sheet_file)
         rows.append([run_id, full_sheet_path, str(lane_number), run.get("datafolder")])
 
-    with open(output_file, mode="w", newline="") as csvfile:
+    with open(output_file, mode="+w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["id", "samplesheet", "lane", "flowcell"])
         writer.writerows(rows)
