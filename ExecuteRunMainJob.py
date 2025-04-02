@@ -1,127 +1,7 @@
-import sys
-sys.path.append("../bfabric-web-apps")
 
-import bfabric_web_apps
-from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
-import pandas as pd
-from io import StringIO
 import os
 import csv
-import dash
-
-
-# Samplesheets
-
-def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
-    with open(filepath, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
-    # Locate the [Data] line.
-    data_start_idx = None
-    for i, line in enumerate(lines):
-        if line.strip().startswith("[Data]"):
-            data_start_idx = i
-            break
-
-    if data_start_idx is None:
-        return pd.DataFrame()
-
-    # Read data starting right after [Data]
-    csv_lines = lines[data_start_idx + 1:]  # +1 to include header row
-
-    csv_string = "".join(csv_lines)
-    df = pd.read_csv(StringIO(csv_string))
-
-    # Select only the specific columns
-    columns_to_keep = ["Sample_ID", "Sample_Name", "index", "index2", "Sample_Project"]
-    df = df[columns_to_keep]
-
-    return df
-
-
-def update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path):
-    # Convert the table data (edited values from the UI) to a DataFrame. 
-    updated_df = pd.DataFrame(table_data)
-    if selected_rows is None or len(selected_rows) == 0:
-        updated_df = updated_df.iloc[0:0]
-    else:
-        updated_df = updated_df.iloc[selected_rows]
-
-    # Read the full original CSV file as a list of lines using the provided path.
-    with open(csv_path, 'r', encoding='utf-8') as f:
-        all_lines = f.readlines()
-
-    # Locate the line where the "[Data]" marker is.
-    data_marker_index = None
-    for i, line in enumerate(all_lines):
-        if line.strip().startswith("[Data]"):
-            data_marker_index = i
-            break
-    if data_marker_index is None:
-        return "Error: [Data] section not found in CSV."
-
-    # Ensure there is a header line after the [Data] marker.
-    if len(all_lines) <= data_marker_index + 1:
-        return "Error: Data header line missing in CSV."
-
-    # Preserve all lines up to and including the original data header line.
-    preserved_lines = all_lines[:data_marker_index + 2]
-
-    # Extract the original header columns.
-    orig_header_line = all_lines[data_marker_index + 1]
-    orig_header_cols = orig_header_line.strip().split(",")
-
-    # Build new data rows aligned with the original header.
-    new_data_rows = []
-    for _, row in updated_df.iterrows():
-        new_row = []
-        for col in orig_header_cols:
-            if col in updated_df.columns:
-                new_row.append(str(row[col]))
-            else:
-                new_row.append("")
-        new_data_rows.append(",".join(new_row) + "\n")
-
-    new_data_csv = "".join(new_data_rows)
-    new_file_content = "".join(preserved_lines) + new_data_csv
-
-    # Write the reassembled content back to the CSV file.
-    with open(csv_path, 'w', encoding='utf-8', newline='') as f:
-        f.write(new_file_content)
-
-
-
-
-def load_samplesheet_data_when_loading_app(token_data, lane_value, csv_list):
-    if not token_data:
-        raise dash.exceptions.PreventUpdate
-    
-    if lane_value == None:
-         return [], [], []
-
-    try:
-        lane_index = int(lane_value)
-    except (ValueError, TypeError):
-        lane_index = 0
-
-    if lane_index >= len(csv_list):
-        raise dash.exceptions.PreventUpdate(f"Lane {lane_value} does not exist.")
-
-    csv_path = csv_list[lane_index]
-    if not os.path.isfile(csv_path):
-        raise dash.exceptions.PreventUpdate(f"{csv_path} doesn't exist yet.")
-
-    df = parse_samplesheet_data_only(csv_path)
-    if df.empty:
-        return [], [], []
-
-    editable_cols = {"index", "index2"}
-    columns = [{"name": col, "id": col, "editable": (col in editable_cols)} for col in df.columns]
-    data = df.to_dict("records")
-    all_indices = list(range(len(df)))
-    return data, columns, all_indices
-#---------------------------------------------------------------------------------------------------#
-
+import pandas as pd
 # run_main_job
 
 
@@ -235,3 +115,6 @@ def create_resource_paths(token_data, base_dir):
                 resource_paths[full_path] = container_id
 
     return resource_paths
+
+
+
