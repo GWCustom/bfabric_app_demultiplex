@@ -166,3 +166,8 @@ cython_debug/
 Dockerfile
 
 resource_example*
+
+
+# Ignore samplesheets
+Samplesheet_lane_*
+pipeline_samplesheet.csv
