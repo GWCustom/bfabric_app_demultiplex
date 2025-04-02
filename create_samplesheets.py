@@ -18,7 +18,7 @@ def create_samplesheets(
     output_file_pipeline_samplesheet="pipeline_samplesheet.csv"
 ):
     """
-    Create lane-specific NovaSeq6000 sample sheets (mRNA ligation prep) and a pipeline_samplesheet.csv.
+    Create lane-specific sample sheets (mRNA ligation prep) and a pipeline_samplesheet.csv.
     
     Steps:
       1. Query metadata for run, rununit, and instrument.
