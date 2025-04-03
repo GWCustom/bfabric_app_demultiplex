@@ -1,12 +1,27 @@
-
 import os
 import csv
 import pandas as pd
-# run_main_job
 
-
+# ---------------------------
+# Read File as Bytes
+# ---------------------------
 def read_file_as_bytes(file_path, max_size_mb=400):
-    """Reads any file type and stores it as a byte string in a dictionary."""
+    """
+    Reads a file and returns its content as a byte string.
+
+    This function checks if the file size exceeds a specified limit (default 400MB).
+    If the file size is within the limit, it opens the file in binary mode and reads its content.
+
+    Args:
+        file_path (str): Path to the file to be read.
+        max_size_mb (int): Maximum allowed file size in megabytes. Defaults to 400.
+
+    Returns:
+        bytes: The contents of the file as a byte string.
+
+    Raises:
+        ValueError: If the file size exceeds the maximum allowed size.
+    """
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)  # Convert bytes to MB
     if file_size_mb > max_size_mb:
         raise ValueError(f"File {file_path} exceeds {max_size_mb}MB limit ({file_size_mb:.2f}MB).")
@@ -17,64 +32,36 @@ def read_file_as_bytes(file_path, max_size_mb=400):
     return file_as_bytes
 
 
-def parse_samples_csv(file_path):
-    """
-    Parses a sample CSV file that includes a [Data] section.
-    
-    The function skips header sections until it reaches the "[Data]" marker.
-    The row immediately following "[Data]" is assumed to be the header for the sample data.
-    
-    Returns:
-        list: A list of dictionaries, each representing a sample.
-    """
-    samples = []
-    with open(file_path, newline='') as f:
-        lines = f.readlines()
-
-    # Find the index of the [Data] section.
-    data_index = None
-    for i, line in enumerate(lines):
-        if line.strip().startswith("[Data]"):
-            data_index = i
-            break
-
-    if data_index is None:
-        raise ValueError(f"No [Data] section found in file: {file_path}")
-
-    # The header row is the next line after the [Data] marker.
-    header = lines[data_index + 1].strip().split(',')
-    # Data rows start after the header.
-    for line in lines[data_index + 2:]:
-        if not line.strip():
-            continue
-        row = line.strip().split(',')
-        if len(row) < len(header):
-            continue
-        sample_data = dict(zip(header, row))
-        samples.append(sample_data)
-    return samples
-
+# ---------------------------
+# Resource Path Construction
+# ---------------------------
 def create_resource_paths(token_data, base_dir):
     """
-    Constructs a dictionary of resource paths (keys) and their corresponding container IDs (values)
-    using data from pipeline_samplesheet.csv and sample CSV files.
-    
+    Constructs a dictionary mapping resource file paths to container IDs using pipeline and sample CSV data.
+
     Process:
       - Reads pipeline_samplesheet.csv to obtain pipeline rows.
-      - For each pipeline row, it:
-          • Determines the formatted lane string (e.g. L001, L002, etc.).
+      - For each pipeline row:
+          • Formats the lane number as a string (e.g., L001, L002, etc.).
           • Extracts the samplesheet's basename from the pipeline row.
-          • Checks if the samplesheet is among the provided csv_list.
-          • Parses the samples CSV file to obtain sample metadata.
-          • Enumerates the samples to assign an order (S1, S2, …).
+          • Parses the corresponding samples CSV file to obtain sample metadata.
+          • Enumerates the samples to assign an order (e.g., S1, S2, ...).
           • Uses the Sample_Project field as the container ID.
-          • Constructs file paths for both R1 and R2 reads:
+          • Constructs file paths for both R1 and R2 reads in the format:
                 <Sample_Name>_Sx_<lane_str>_R{read}_001.fastq.gz
       - The full resource path is built as:
             <base_dir>/<pipeline_id>/<lane_str>/<container_id>/<sample_id>/<file_name>
-    
+
+    Args:
+        token_data (dict): Token data for authentication (currently not used in this function).
+        base_dir (str): Base directory where the resource files will be stored.
+
     Returns:
-        dict: Keys are resource paths and values are the corresponding container IDs.
+        dict: A dictionary where keys are resource file paths and values are the corresponding container IDs.
+              For example:
+              {
+                  "/STORAGE/OUTPUT/12345/L001/ContainerA/1001/SampleName_S1_L001_R1_001.fastq.gz": "ContainerID",
+              }
     """
     resource_paths = {}
 
@@ -117,4 +104,49 @@ def create_resource_paths(token_data, base_dir):
     return resource_paths
 
 
+# ---------------------------
+# Parse Samples CSV | Helper function for the Resource Path Construction
+# ---------------------------
+def parse_samples_csv(file_path):
+    """
+    Parses a sample CSV file that includes a "[Data]" section.
 
+    The function skips header sections until it reaches the "[Data]" marker.
+    The row immediately following "[Data]" is assumed to be the header for the sample data.
+    Each subsequent row is converted into a dictionary using the header.
+
+    Args:
+        file_path (str): Path to the sample CSV file.
+
+    Returns:
+        list: A list of dictionaries, each representing a sample.
+
+    Raises:
+        ValueError: If no "[Data]" section is found in the file.
+    """
+    samples = []
+    with open(file_path, newline='') as f:
+        lines = f.readlines()
+
+    # Find the index of the [Data] section.
+    data_index = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("[Data]"):
+            data_index = i
+            break
+
+    if data_index is None:
+        raise ValueError(f"No [Data] section found in file: {file_path}")
+
+    # The header row is the next line after the [Data] marker.
+    header = lines[data_index + 1].strip().split(',')
+    # Data rows start after the header.
+    for line in lines[data_index + 2:]:
+        if not line.strip():
+            continue
+        row = line.strip().split(',')
+        if len(row) < len(header):
+            continue
+        sample_data = dict(zip(header, row))
+        samples.append(sample_data)
+    return samples

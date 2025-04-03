@@ -1,44 +1,38 @@
-"""
-This module integrates bfabric_web_apps with bfabric_web_app_template,
-ensuring that both modules are of the same version (e.g., 0.1.6) to avoid compatibility issues.
-It sets up the necessary configurations, defines a Dash callback for running the main job pipeline,
-and starts the web server.
+# This module integrates bfabric_web_apps with bfabric_web_app_template,
+# ensuring that both modules are of the same version (e.g., 0.1.6) to avoid compatibility issues.
+# It sets up the necessary configurations, defines a Dash callback for running the main job pipeline,
+# and starts the web server.
 
-Before running the application, ensure that bfabric_web_apps and bfabric_web_app_template are compatible!.
-"""
+# Before running the application, ensure that bfabric_web_apps and bfabric_web_app_template are compatible!.
 
 import sys
-import os
-from dash import Input, Output, State
-
 sys.path.append("../bfabric-web-apps")
 
+import os
+from dash import Input, Output, State
 import bfabric_web_apps
 from bfabric_web_apps import run_main_job
 from bfabric_web_apps.utils.redis_queue import q
-
 import GetDataFromUser
-
+from GetDataFromUser import (
+    update_csv_based_on_ui
+)
 from ExecuteRunMainJob import (
     read_file_as_bytes,
     create_resource_paths
 )
-
 import GetDataFromBfabric
-from GetDataFromBfabric import (
-    update_csv_bfore_runing_main_job,
-)
-
 from generic.callbacks import app
 
 # Set configuration parameters for bfabric_web_apps.
 bfabric_web_apps.CONFIG_FILE_PATH = "~/.bfabricpy.yml"
 bfabric_web_apps.DEVELOPER_EMAIL_ADDRESS = "griffin@gwcustom.com"
 bfabric_web_apps.BUG_REPORT_EMAIL_ADDRESS = "gwtools@fgcz.system"
+bfabric_web_apps.debug = True
 
 
 # ---------------------------
-# Run Pipeline Callback
+# Run Main Job Callback
 # ---------------------------
 @ app.callback(
     [
@@ -61,40 +55,61 @@ bfabric_web_apps.BUG_REPORT_EMAIL_ADDRESS = "gwtools@fgcz.system"
 )
 def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, lane_val, csv_list):
     """
-    Dash callback for running the main job pipeline.
-
-    This callback is triggered when the "Submit" button is clicked. It performs the following:
-      1. Updates the selected lane CSV file with user edits (if a lane is selected).
-      2. Prepares a dictionary of files (as byte strings) to be processed, including:
-            - Lane sample sheets.
-            - The pipeline sample sheet.
-            - The NFC_DMX configuration file.
-      3. Constructs bash commands to run the nf-core demultiplex pipeline using Nextflow.
-      4. Creates resource paths to map file paths to container IDs.
-      5. Enqueues the main job for asynchronous processing via a Redis queue.
-
+    Callback to run the main job pipeline asynchronously when the "Submit" button is clicked.
+    
+    The callback executes the following steps:
+      1. **Update CSV File:**  
+         If a lane is selected (indicated by `lane_val`), the corresponding CSV file in `csv_list`
+         is updated with any user edits from `table_data` and the rows selected in `selected_rows`.
+      
+      2. **Prepare Files Dictionary:**  
+         Constructs a dictionary named `files_as_byte_strings` that maps file paths (as keys) to the
+         file contents read as byte strings (as values). The structure is as follows:
+            {
+                "./filename": <file_as_bytes>,
+            }
+         - For each lane sample sheet, the key is formatted as "./<filename>" using the basename of the file.
+         - In addition, the pipeline sample sheet and the NFC_DMX configuration file are also included.
+      
+      3. **Construct Bash Commands:**  
+         Creates a list of bash command strings that are used to run the nf-core demultiplex pipeline 
+         via Nextflow.
+      
+      4. **Create Resource Paths:**  
+         Uses `create_resource_paths` to map file paths or directories to container IDs based on the
+         provided token data and the designated output directory.
+      
+      5. **Enqueue the Job:**  
+         The main job is enqueued for asynchronous processing via a Redis queue. The job is submitted 
+         using the provided queue (either "light" or "heavy") along with all prepared parameters:
+            - The dictionary of files as byte strings.
+            - The list of bash commands.
+            - The resource paths mapping.
+            - Attachment paths for monitoring outputs (e.g., a MultiQC report).
+            - The token extracted from URL parameters.
+    
     Parameters:
-        n_clicks (int): The number of times the submit button has been clicked.
-        url_params (str): URL search parameters (often used for tokens or authentication).
-        token_data (dict): Token data required for generating resource paths.
-        queue (str): The name of the Redis queue.
-        table_data (list): Data from the samplesheet table reflecting user edits.
-        selected_rows (list): List of selected row indices from the samplesheet table.
-        lane_val (str/int): The selected lane identifier.
-        csv_list (dict): Mapping of lane identifiers to their corresponding CSV file paths.
-
+        n_clicks (int): Number of times the submit button has been clicked.
+        url_params (str): URL parameters (includes token information for authentication).
+        token_data (dict): Authentication token data required for resource path generation.
+        queue (str): Name of the Redis queue to use ("light" or "heavy").
+        table_data (list): List of dictionaries representing the current state of the samplesheet table,
+                           including any user edits.
+        selected_rows (list): List of indices indicating which rows in the samplesheet table are selected.
+        lane_val (int or str): Identifier for the selected lane (used to pick the correct CSV file from csv_list).
+        csv_list (list): List mapping lane identifiers to their corresponding CSV file paths.
+    
     Returns:
-        tuple: Contains:
-            - Boolean indicating if the success alert should be open.
-            - Boolean indicating if the failure alert should be open.
-            - A string with the failure message (if any).
-            - A string message to refresh workunits.
+            - (bool) Success alert state: True if the job was submitted successfully.
+            - (bool) Failure alert state: True if the job submission failed.
+            - (str) Failure message: An error message if the submission failed; otherwise, an empty string.
+            - (str) Refresh workunits message: A status message indicating the outcome of the job submission.
     """
     try:
         # 1. Update the selected lane CSV with the user edits.
         if lane_val:
             csv_path = csv_list[lane_val]
-            update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path)
+            update_csv_based_on_ui(table_data, selected_rows, csv_path)
 
         # 2. Prepare the final dictionary of files as byte strings.
         files_as_byte_strings = {}
@@ -114,6 +129,9 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 
         # Construct the bash command to run the nf-core demultiplex pipeline.
         bash_commands = [
+
+            "rm -rf /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/work"
+            ,
             f"""/home/nfc/.local/bin/nextflow run nf-core/demultiplex \
             -profile docker \
             --input /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/pipeline_samplesheet.csv \
@@ -155,7 +173,7 @@ if __name__ == "__main__":
     # Start the Dash web server.
     # The 'app' instance is provided by GetDataFromUser.py.
     GetDataFromUser.app.run_server(
-        debug=True,
+        debug=bfabric_web_apps.debug,
         port=bfabric_web_apps.PORT,
         host=bfabric_web_apps.HOST
     )

@@ -1,52 +1,37 @@
 import sys
-import csv
-import os
-from datetime import datetime
-
-# Append relative path to locate bfabric-web-apps package
 sys.path.append("../bfabric-web-apps")
 
 import bfabric_web_apps
 from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
 from sample_sheet import SampleSheet, Sample
-
-
-
-
-
-import sys
-sys.path.append("../bfabric-web-apps")
-
-import bfabric_web_apps
-from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
+from datetime import datetime
 import pandas as pd
 from io import StringIO
 import os
 import csv
-import dash
-
-
-
-
-
 from dash import Input, Output, State, html, dcc, dash_table, callback, no_update
 import dash.exceptions
 import dash_bootstrap_components as dbc
 from generic.callbacks import app
 
-
-
-
-
+#-----------------------
+# Callback for creating samplesheets when loading the app
+#-----------------------
 @app.callback(
     Output('csv_list_store', 'data'),
     [Input("token_data", "data")],
     [State("app_data", "data")]
 )
-def create_samplesheets_details(token_data, app_data):
+def create_samplesheets_when_loading_app(token_data, app_data):
     """
-    Generates the required samplesheet CSV files and returns as output:
-    - csv_list: list of created CSV filenames (excluding the pipeline_samplesheet).
+    Generates the required samplesheet CSV files and returns as output.
+
+    Args:
+        token_data (dict): Authentication token data.
+        app_data (dict): Application metadata.
+
+    Returns:
+        list: List of created CSV filenames (excluding the pipeline_samplesheet).
     """
     if token_data:
         csv_list = create_samplesheets(
@@ -57,133 +42,9 @@ def create_samplesheets_details(token_data, app_data):
         return csv_list
 
 
-# Samplesheets
-
-def parse_samplesheet_data_only(filepath: str) -> pd.DataFrame:
-    with open(filepath, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
-    # Locate the [Data] line.
-    data_start_idx = None
-    for i, line in enumerate(lines):
-        if line.strip().startswith("[Data]"):
-            data_start_idx = i
-            break
-
-    if data_start_idx is None:
-        return pd.DataFrame()
-
-    # Read data starting right after [Data]
-    csv_lines = lines[data_start_idx + 1:]  # +1 to include header row
-
-    csv_string = "".join(csv_lines)
-    df = pd.read_csv(StringIO(csv_string))
-
-    # Select only the specific columns
-    columns_to_keep = ["Sample_ID", "Sample_Name", "index", "index2", "Sample_Project"]
-    df = df[columns_to_keep]
-
-    return df
-
-
-def update_csv_bfore_runing_main_job(table_data, selected_rows, csv_path):
-    # Convert the table data (edited values from the UI) to a DataFrame. 
-    updated_df = pd.DataFrame(table_data)
-    if selected_rows is None or len(selected_rows) == 0:
-        updated_df = updated_df.iloc[0:0]
-    else:
-        updated_df = updated_df.iloc[selected_rows]
-
-    # Read the full original CSV file as a list of lines using the provided path.
-    with open(csv_path, 'r', encoding='utf-8') as f:
-        all_lines = f.readlines()
-
-    # Locate the line where the "[Data]" marker is.
-    data_marker_index = None
-    for i, line in enumerate(all_lines):
-        if line.strip().startswith("[Data]"):
-            data_marker_index = i
-            break
-    if data_marker_index is None:
-        return "Error: [Data] section not found in CSV."
-
-    # Ensure there is a header line after the [Data] marker.
-    if len(all_lines) <= data_marker_index + 1:
-        return "Error: Data header line missing in CSV."
-
-    # Preserve all lines up to and including the original data header line.
-    preserved_lines = all_lines[:data_marker_index + 2]
-
-    # Extract the original header columns.
-    orig_header_line = all_lines[data_marker_index + 1]
-    orig_header_cols = orig_header_line.strip().split(",")
-
-    # Build new data rows aligned with the original header.
-    new_data_rows = []
-    for _, row in updated_df.iterrows():
-        new_row = []
-        for col in orig_header_cols:
-            if col in updated_df.columns:
-                new_row.append(str(row[col]))
-            else:
-                new_row.append("")
-        new_data_rows.append(",".join(new_row) + "\n")
-
-    new_data_csv = "".join(new_data_rows)
-    new_file_content = "".join(preserved_lines) + new_data_csv
-
-    # Write the reassembled content back to the CSV file.
-    with open(csv_path, 'w', encoding='utf-8', newline='') as f:
-        f.write(new_file_content)
-
-
-
-
-def load_samplesheet_data_when_loading_app(token_data, lane_value, csv_list):
-    if not token_data:
-        raise dash.exceptions.PreventUpdate
-    
-    if lane_value == None:
-         return [], [], []
-
-    try:
-        lane_index = int(lane_value)
-    except (ValueError, TypeError):
-        lane_index = 0
-
-    if lane_index >= len(csv_list):
-        raise dash.exceptions.PreventUpdate(f"Lane {lane_value} does not exist.")
-
-    csv_path = csv_list[lane_index]
-    if not os.path.isfile(csv_path):
-        raise dash.exceptions.PreventUpdate(f"{csv_path} doesn't exist yet.")
-
-    df = parse_samplesheet_data_only(csv_path)
-    if df.empty:
-        return [], [], []
-
-    editable_cols = {"index", "index2"}
-    columns = [{"name": col, "id": col, "editable": (col in editable_cols)} for col in df.columns]
-    data = df.to_dict("records")
-    all_indices = list(range(len(df)))
-    return data, columns, all_indices
-
-
-
-"""
-Module: create_samplesheets
-Description:
-    This module provides functionality for creating lane-specific sample sheets for mRNA ligation prep,
-    as well as generating a companion pipeline_samplesheet.csv for Nextflow usage.
-    
-    The main functions include:
-      - create_samplesheets: Queries necessary metadata and creates individual samplesheets for each lane.
-      - create_pipeline_samplesheet_csv: Generates a CSV that maps lanes to their samplesheet file paths.
-      - manipulate_date_format: Reformats a datetime string to a simplified date format.
-"""
-
-
-
+#-----------------------
+# Function for creating the samplesheets based on API calls to Bfabric
+#-----------------------
 
 def create_samplesheets(token_data, app_data, output_file_pipeline_samplesheet="pipeline_samplesheet.csv"):
     """
@@ -315,17 +176,22 @@ def create_samplesheets(token_data, app_data, output_file_pipeline_samplesheet="
     return list(lane_samplesheet_files.values())
 
 
+#-----------------------
+# Helper function: Create Pipeline Samplesheet CSV
+#-----------------------
+
 def create_pipeline_samplesheet_csv(run, rununit_data, lane_samplesheet_files, output_file):
     """
-    Create the pipeline_samplesheet.csv for Nextflow usage.
-    
-    The generated CSV contains four columns: id, samplesheet, lane, flowcell.
-    
-    Parameters:
-        run: Run metadata that includes the datafolder path.
-        rununit_data: Rununit metadata.
-        lane_samplesheet_files: Mapping of lane numbers to their samplesheet filenames.
-        output_file: The output filename for the pipeline samplesheet CSV.
+    Creates the pipeline_samplesheet.csv for Nextflow usage.
+
+    Args:
+        run (dict): Run metadata that includes the datafolder path.
+        rununit_data (dict): Rununit metadata.
+        lane_samplesheet_files (dict): Mapping of lane numbers to their samplesheet filenames.
+        output_file (str): The output filename for the pipeline samplesheet CSV.
+
+    Returns:
+        None
     """
     run_id = os.path.basename(run.get("datafolder"))
     rows = []
@@ -340,6 +206,9 @@ def create_pipeline_samplesheet_csv(run, rununit_data, lane_samplesheet_files, o
     print("pipeline_samplesheet.csv written to: {}".format(output_file))
 
 
+#-----------------------
+# Helper function: Manipulate Date Format
+#-----------------------
 def manipulate_date_format(original_str):
     """
     Convert a datetime string from 'YYYY-mm-dd HH:MM:SS' to 'M/D/YYYY',
@@ -353,3 +222,125 @@ def manipulate_date_format(original_str):
     """
     dt_obj = datetime.strptime(original_str, "%Y-%m-%d %H:%M:%S")
     return "{}/{}/{}".format(dt_obj.month, dt_obj.day, dt_obj.year)
+
+
+#-----------------------
+# Callback: Load Samplesheet Data for UI
+#-----------------------
+@app.callback(
+    Output("samplesheet-table", "data"),
+    Output("samplesheet-table", "columns"),
+    Output("samplesheet-table", "selected_rows"),
+    State("token_data", "data"),
+    Input("lane-dropdown", "value"),
+    Input("csv_list_store", "data"),  # Use the dynamically created CSV list,
+)
+def load_samplesheet_data(token_data, lane_value, csv_list):
+    """
+    Load and return samplesheet data based on the token, selected lane, and available CSV files.
+
+    Args:
+        token_data (dict): Authentication token data.
+        lane_value (int or None): The index of the selected lane.
+        csv_list (list): List of CSV file paths.
+
+    Returns:
+        tuple: A tuple containing:
+            - (list): Table data (list of dictionaries).
+            - (list): Table columns (list of dictionaries).
+            - (list): Indices of selected rows.
+    """
+    if not csv_list or not isinstance(csv_list, list):
+        raise dash.exceptions.PreventUpdate("No CSV list available.")
+    return load_samplesheet_data_when_loading_app(token_data, lane_value, csv_list)
+
+#-----------------------
+# Helper function: Load Samplesheet Data When Loading App
+#-----------------------
+
+def load_samplesheet_data_when_loading_app(token_data, lane_value, csv_list):
+    """
+    Loads samplesheet data for a specific lane from a CSV file.
+
+    Args:
+        token_data (dict): Authentication token data.
+        lane_value (int or None): The index of the selected lane.
+        csv_list (list): List of CSV file paths.
+
+    Returns:
+        tuple: A tuple containing:
+            - list: Table data (list of dictionaries).
+            - list: Table columns (list of dictionaries).
+            - list: Indices of selected rows.
+    """
+    if not token_data:
+        raise dash.exceptions.PreventUpdate
+    
+    if lane_value == None:
+         return [], [], []
+
+    try:
+        lane_index = int(lane_value)
+    except (ValueError, TypeError):
+        lane_index = 0
+
+    if lane_index >= len(csv_list):
+        raise dash.exceptions.PreventUpdate(f"Lane {lane_value} does not exist.")
+
+    csv_path = csv_list[lane_index]
+    if not os.path.isfile(csv_path):
+        raise dash.exceptions.PreventUpdate(f"{csv_path} doesn't exist yet.")
+
+    df = parse_samplesheet_data_only(csv_path)
+    if df.empty:
+        return [], [], []
+
+    editable_cols = {"index", "index2"}
+    columns = [{"name": col, "id": col, "editable": (col in editable_cols)} for col in df.columns]
+    data = df.to_dict("records")
+    all_indices = list(range(len(df)))
+    return data, columns, all_indices
+
+
+
+#-----------------------
+# Helper function: Parse Samplesheet Data Only
+#-----------------------
+
+def parse_samplesheet_data_only(filepath):
+    """
+    Parses the samplesheet CSV file to extract the data section.
+
+    This function locates the "[Data]" marker and reads the CSV data starting from the header row
+    following the marker. Only specific columns are retained.
+
+    Args:
+        filepath (str): Path to the samplesheet CSV file.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the samplesheet data.
+    """
+    with open(filepath, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    # Locate the [Data] line.
+    data_start_idx = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("[Data]"):
+            data_start_idx = i
+            break
+
+    if data_start_idx is None:
+        return pd.DataFrame()
+
+    # Read data starting right after [Data]
+    csv_lines = lines[data_start_idx + 1:]  # +1 to include header row
+
+    csv_string = "".join(csv_lines)
+    df = pd.read_csv(StringIO(csv_string))
+
+    # Select only the specific columns
+    columns_to_keep = ["Sample_ID", "Sample_Name", "index", "index2", "Sample_Project"]
+    df = df[columns_to_keep]
+
+    return df
