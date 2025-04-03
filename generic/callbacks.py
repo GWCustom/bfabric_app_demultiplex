@@ -58,7 +58,6 @@ def generic_process_url_and_token(url_params):
     Returns:
         tuple: Data for token, token metadata, entity, page title, and session details.
     """
-
     return process_url_and_token(url_params)
 
 ## Bug Report Handling

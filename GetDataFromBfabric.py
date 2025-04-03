@@ -1,5 +1,5 @@
 import sys
-sys.path.append("../bfabric-web-apps")
+sys.path.insert(0, "../bfabric-web-apps")
 
 import bfabric_web_apps
 from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
@@ -34,13 +34,13 @@ def create_samplesheets_when_loading_app(token_data, app_data):
         list: List of created CSV filenames (excluding the pipeline_samplesheet).
     """
     if token_data:
-        csv_list = create_samplesheets(
+        csv_list, output_file = create_samplesheets(
             token_data,
             app_data,
             output_file_pipeline_samplesheet="pipeline_samplesheet.csv"
         )
         L = bfabric_web_apps.get_logger(token_data)
-        L.log_operation("Samplesheets Created", f"Samplesheets successfully created: {', '.join(csv_list)}")
+        L.log_operation("Samplesheets Created", f"Samplesheets successfully created: {', '.join(csv_list)} and {output_file}")
         return csv_list
 
 
@@ -64,7 +64,8 @@ def create_samplesheets(token_data, app_data, output_file_pipeline_samplesheet="
         output_file_pipeline_samplesheet: Filename for the pipeline samplesheet CSV.
     
     Returns:
-        A list of filenames for lane-specific CSV samplesheets (excluding pipeline_samplesheet.csv).
+        - A list of filenames for lane-specific CSV samplesheets (excluding pipeline_samplesheet.csv).
+        - output_file, a string with the pipeline_samaplesheet name
     """
     L = bfabric_web_apps.get_logger(token_data)
     wrapper = bfabric_interface.get_wrapper()
@@ -174,8 +175,8 @@ def create_samplesheets(token_data, app_data, output_file_pipeline_samplesheet="
         lane_samplesheet_files[lane_number] = lane_sheet_filename
 
     # Generate the pipeline_samplesheet.csv (not included in the returned list)
-    create_pipeline_samplesheet_csv(run[0], rununit_data, lane_samplesheet_files, output_file_pipeline_samplesheet)
-    return list(lane_samplesheet_files.values())
+    output_file = create_pipeline_samplesheet_csv(run[0], rununit_data, lane_samplesheet_files, output_file_pipeline_samplesheet)
+    return list(lane_samplesheet_files.values()), output_file
 
 
 #-----------------------
@@ -207,6 +208,8 @@ def create_pipeline_samplesheet_csv(run, rununit_data, lane_samplesheet_files, o
         writer.writerows(rows)
 
     print("pipeline_samplesheet.csv written to: {}".format(output_file))
+
+    return output_file
 
 
 #-----------------------

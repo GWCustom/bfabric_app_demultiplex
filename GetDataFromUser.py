@@ -1,5 +1,5 @@
 import sys
-sys.path.append("../bfabric-web-apps")
+sys.path.insert(0, "../bfabric-web-apps")
 
 import bfabric_web_apps
 from bfabric_web_apps.utils.redis_queue import q
@@ -14,7 +14,7 @@ from generic.components import no_auth
 
 import os
 from ExecuteRunMainJob import create_resource_paths
-from GetDataFromBfabric import load_samplesheet_data_when_loading_app
+from GetDataFromBfabric import load_samplesheet_data_when_loading_app, parse_samplesheet_data_only
 
 # ------------------------------------------------------------------------------
 # Sidebar Components: Lane Dropdown, Queue Selection Dropdown, and Submit Button (Run Main Job)
@@ -227,6 +227,8 @@ def update_ui(token_data, entity_data):
         )
 
     else:
+        L = bfabric_web_apps.get_logger(token_data)
+        L.log_operation("INFO", "Application initialization started.") #Upgrade in Template
         try:
             samplesheet_table = dash_table.DataTable(
                 id='samplesheet-table',
@@ -355,24 +357,48 @@ def highlight_selected_columns(selected_columns):
 )
 def save_on_lane_change(new_lane, prev_lane, table_data, selected_rows, csv_list):
     """
-    Save the current samplesheet data to the appropriate CSV file when the lane selection changes.
+    Save updates to the current CSV file when the lane selection changes, but only if the table data has been modified.
+
+    This callback is triggered when a user selects a new lane from the dropdown. It performs the following steps:
+      1. If a previous lane and a valid CSV list exist, it retrieves the CSV file path for the previously selected lane.
+      2. Loads the current CSV data (from the "[Data]" section) into a DataFrame using `parse_samplesheet_data_only`.
+      3. Constructs a new DataFrame from the provided table data. If specific rows are selected, it filters the DataFrame accordingly.
+      4. Compares the new DataFrame with the existing CSV DataFrame. If there is any difference, it calls 
+         `update_csv_based_on_ui` to update the CSV file with the new data.
+      5. Returns the new lane index to store as the previous lane for subsequent changes.
 
     Args:
-        new_lane (int): The newly selected lane index.
-        prev_lane (int): The previously selected lane index.
-        table_data (list): List of dictionaries representing the samplesheet data.
-        selected_rows (list): List of indices for rows that are selected.
-        csv_list (list): List of CSV file paths corresponding to lanes.
+        new_lane (int): The newly selected lane index from the dropdown.
+        prev_lane (int or None): The previously selected lane index used to reference the current CSV file.
+        table_data (list): A list of dictionaries representing the current state of the samplesheet table.
+        selected_rows (list or None): List of indices indicating which rows in the table are selected.
+        csv_list (list): List of CSV file paths corresponding to each lane.
+
     Returns:
-        int: The new lane value, stored for future reference.
+        int: The new lane index, which will be stored as the previous lane for future lane-change events.
     """
     if prev_lane is not None and csv_list:
-        # Get the CSV path for the lane that is about to be switched out.
+        # Get the CSV file path for the current lane before switching.
         csv_path = csv_list[prev_lane]
-        update_csv_based_on_ui(table_data, selected_rows, csv_path)
+        
+        # Load the current CSV data from the file.
+        current_df = parse_samplesheet_data_only(csv_path)
+        
+        # Create a DataFrame from the table data.
+        new_df = pd.DataFrame(table_data)
+        # If there are selected rows, only consider those rows.
+        if selected_rows:
+            new_df = new_df.iloc[selected_rows]
+        
+        # Compare the new DataFrame with the CSV DataFrame.
+        # .equals() checks if they have the same shape and elements.
+        if not new_df.equals(current_df):
+            # Only update the CSV if there is an actual difference.
+            update_csv_based_on_ui(table_data, selected_rows, csv_path)
    
     # Return the new lane as the "previous" lane for the next change.
     return new_lane
+
 
 # ------------------------------------------------------------------------------
 # Function: Update CSV Based on UI Data

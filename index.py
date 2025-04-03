@@ -6,7 +6,7 @@
 # Before running the application, ensure that bfabric_web_apps and bfabric_web_app_template are compatible!.
 
 import sys
-sys.path.append("../bfabric-web-apps")
+sys.path.insert(0, "../bfabric-web-apps")
 
 import os
 from dash import Input, Output, State
@@ -140,7 +140,7 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             --demultiplexer bcl2fastq \
             --skip_tools samshee,checkqc \
             -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
-            -r 1.5.4 > {base_dir}/nextflow.log 2>&1 &"""
+            -r 1.5.4 > {base_dir}/nextflow.log 2>&1"""
         ]
 
         # 4. Create resource paths mapping file or folder to container IDs.
@@ -148,11 +148,10 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         L.log_operation("Pipeline Info", f"Resource paths created: {resource_paths}")
         print("resource_paths", resource_paths)
 
-        # Set attachment paths (e.g., for reports) to be monitored for output.
+        # Set attachment paths (e.g., for reports)
         attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
-        L.log_operation("Pipeline Info", "Attachment paths set: multiqc_report.html will be monitored.")
+        L.log_operation("Pipeline Info", "Attachment paths created: {attachment_paths}")
 
-        """
         # 5. Enqueue the main job into the Redis queue for asynchronous execution.
         q(queue).enqueue(run_main_job, kwargs={
             "files_as_byte_strings": files_as_byte_strings,
@@ -161,9 +160,9 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             "attachment_paths": attachment_paths,
             "token": url_params
         })
-        """        
+      
         # Log that the job was submitted successfully.
-        L.log_operation("Pipeline Info", "Job submitted successfully to Redis queue.")
+        L.log_operation("Pipeline Info", f"Job submitted successfully to {queue} Redis queue.")
         # Return success alert open, failure alert closed, no error message, and a success message.
         return True, False, "", "Job submitted successfully"
 
