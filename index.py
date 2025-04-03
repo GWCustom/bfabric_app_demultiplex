@@ -11,16 +11,11 @@ sys.path.append("../bfabric-web-apps")
 import os
 from dash import Input, Output, State
 import bfabric_web_apps
-from bfabric_web_apps import run_main_job
+from bfabric_web_apps import run_main_job, get_logger, read_file_as_bytes
 from bfabric_web_apps.utils.redis_queue import q
 import GetDataFromUser
-from GetDataFromUser import (
-    update_csv_based_on_ui
-)
-from ExecuteRunMainJob import (
-    read_file_as_bytes,
-    create_resource_paths
-)
+from GetDataFromUser import update_csv_based_on_ui
+from ExecuteRunMainJob import create_resource_paths
 import GetDataFromBfabric
 from generic.callbacks import app
 
@@ -105,7 +100,10 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             - (str) Failure message: An error message if the submission failed; otherwise, an empty string.
             - (str) Refresh workunits message: A status message indicating the outcome of the job submission.
     """
+    L = get_logger(token_data)
     try:
+        # Log that the user has initiated the main job pipeline.
+        L.log_operation("Pipeline Info", "Job is started: User initiated main job pipeline.")
         # 1. Update the selected lane CSV with the user edits.
         if lane_val:
             csv_path = csv_list[lane_val]
@@ -119,10 +117,13 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             # Key format: "./<filename>" (e.g., "./Samplesheet_lane_1.csv")
             key = f"./{os.path.basename(sheet_path)}"
             files_as_byte_strings[key] = read_file_as_bytes(sheet_path)
+            L.log_operation("Pipeline Info", f"File loaded: {key} loaded from {sheet_path}.")
 
         # 3. Add the pipeline sample sheet and NFC_DMX configuration file.
         files_as_byte_strings["./pipeline_samplesheet.csv"] = read_file_as_bytes("./pipeline_samplesheet.csv")
+        L.log_operation("Pipeline Info", "Pipeline samplesheet loaded from ./pipeline_samplesheet.csv.")
         files_as_byte_strings["./NFC_DMX.config"] = read_file_as_bytes("./NFC_DMX.config")
+        L.log_operation("Pipeline Info", "NFC_DMX configuration loaded from ./NFC_DMX.config.")
 
         # Define the output directory for the pipeline.
         base_dir = "/STORAGE/OUTPUT_TEST"
@@ -144,11 +145,14 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 
         # 4. Create resource paths mapping file or folder to container IDs.
         resource_paths = create_resource_paths(token_data, base_dir)
+        L.log_operation("Pipeline Info", f"Resource paths created: {resource_paths}")
         print("resource_paths", resource_paths)
 
         # Set attachment paths (e.g., for reports) to be monitored for output.
         attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
+        L.log_operation("Pipeline Info", "Attachment paths set: multiqc_report.html will be monitored.")
 
+        """
         # 5. Enqueue the main job into the Redis queue for asynchronous execution.
         q(queue).enqueue(run_main_job, kwargs={
             "files_as_byte_strings": files_as_byte_strings,
@@ -157,11 +161,15 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             "attachment_paths": attachment_paths,
             "token": url_params
         })
-
+        """        
+        # Log that the job was submitted successfully.
+        L.log_operation("Pipeline Info", "Job submitted successfully to Redis queue.")
         # Return success alert open, failure alert closed, no error message, and a success message.
         return True, False, "", "Job submitted successfully"
 
     except Exception as e:
+        # Log that the job submission failed.
+        L.log_operation("Pipeline Info", f"Job submission failed: {str(e)}")
         # If an error occurs, return failure alert open with the error message.
         return False, True, f"Job submission failed: {str(e)}", "Job submission failed"
 

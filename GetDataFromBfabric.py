@@ -39,6 +39,8 @@ def create_samplesheets_when_loading_app(token_data, app_data):
             app_data,
             output_file_pipeline_samplesheet="pipeline_samplesheet.csv"
         )
+        L = bfabric_web_apps.get_logger(token_data)
+        L.log_operation("Samplesheets Created", f"Samplesheets successfully created: {', '.join(csv_list)}")
         return csv_list
 
 
@@ -203,6 +205,7 @@ def create_pipeline_samplesheet_csv(run, rununit_data, lane_samplesheet_files, o
         writer = csv.writer(csvfile)
         writer.writerow(["id", "samplesheet", "lane", "flowcell"])
         writer.writerows(rows)
+
     print("pipeline_samplesheet.csv written to: {}".format(output_file))
 
 
@@ -299,6 +302,7 @@ def load_samplesheet_data_when_loading_app(token_data, lane_value, csv_list):
     columns = [{"name": col, "id": col, "editable": (col in editable_cols)} for col in df.columns]
     data = df.to_dict("records")
     all_indices = list(range(len(df)))
+    
     return data, columns, all_indices
 
 

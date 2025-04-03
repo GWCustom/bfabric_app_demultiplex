@@ -3,36 +3,6 @@ import csv
 import pandas as pd
 
 # ---------------------------
-# Read File as Bytes
-# ---------------------------
-def read_file_as_bytes(file_path, max_size_mb=400):
-    """
-    Reads a file and returns its content as a byte string.
-
-    This function checks if the file size exceeds a specified limit (default 400MB).
-    If the file size is within the limit, it opens the file in binary mode and reads its content.
-
-    Args:
-        file_path (str): Path to the file to be read.
-        max_size_mb (int): Maximum allowed file size in megabytes. Defaults to 400.
-
-    Returns:
-        bytes: The contents of the file as a byte string.
-
-    Raises:
-        ValueError: If the file size exceeds the maximum allowed size.
-    """
-    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)  # Convert bytes to MB
-    if file_size_mb > max_size_mb:
-        raise ValueError(f"File {file_path} exceeds {max_size_mb}MB limit ({file_size_mb:.2f}MB).")
-
-    with open(file_path, "rb") as f:  # Read as bytes
-        file_as_bytes = f.read()
-
-    return file_as_bytes
-
-
-# ---------------------------
 # Resource Path Construction
 # ---------------------------
 def create_resource_paths(token_data, base_dir):

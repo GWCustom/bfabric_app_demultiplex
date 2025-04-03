@@ -13,13 +13,8 @@ from generic.callbacks import app
 from generic.components import no_auth
 
 import os
-from ExecuteRunMainJob import (
-    read_file_as_bytes,
-    create_resource_paths
-)
-from GetDataFromBfabric import (
-    load_samplesheet_data_when_loading_app
-)
+from ExecuteRunMainJob import create_resource_paths
+from GetDataFromBfabric import load_samplesheet_data_when_loading_app
 
 # ------------------------------------------------------------------------------
 # Sidebar Components: Lane Dropdown, Queue Selection Dropdown, and Submit Button (Run Main Job)
@@ -345,6 +340,9 @@ def highlight_selected_columns(selected_columns):
     """
     return [{'if': {'column_id': col}, 'background_color': '#D2F3FF'} for col in selected_columns]
 
+# ---------------------------
+# Callback: Save the current samplesheet data from UI to csv
+# ---------------------------
 
 @app.callback(
     Output("previous-lane-store", "data"),
@@ -365,7 +363,6 @@ def save_on_lane_change(new_lane, prev_lane, table_data, selected_rows, csv_list
         table_data (list): List of dictionaries representing the samplesheet data.
         selected_rows (list): List of indices for rows that are selected.
         csv_list (list): List of CSV file paths corresponding to lanes.
-
     Returns:
         int: The new lane value, stored for future reference.
     """
@@ -373,9 +370,9 @@ def save_on_lane_change(new_lane, prev_lane, table_data, selected_rows, csv_list
         # Get the CSV path for the lane that is about to be switched out.
         csv_path = csv_list[prev_lane]
         update_csv_based_on_ui(table_data, selected_rows, csv_path)
+   
     # Return the new lane as the "previous" lane for the next change.
     return new_lane
-
 
 # ------------------------------------------------------------------------------
 # Function: Update CSV Based on UI Data
