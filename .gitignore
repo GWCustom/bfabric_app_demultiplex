@@ -171,3 +171,6 @@ resource_example*
 # Nextflow Samplesheets
 Samplesheet_lane_*
 pipeline_samplesheet.csv
+
+#local_requirements.txt
+local_requirements.txt

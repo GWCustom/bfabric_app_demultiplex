@@ -26,7 +26,6 @@ from bfabric_web_apps import (
     get_redis_queue_layout
 )
 from dash import html
-from create_samplesheets import create_samplesheets
 # Application Initialization
 # ---------------------------
 # Create the Dash app instance.
@@ -59,7 +58,6 @@ def generic_process_url_and_token(url_params):
     Returns:
         tuple: Data for token, token metadata, entity, page title, and session details.
     """
-
     return process_url_and_token(url_params)
 
 ## Bug Report Handling
@@ -133,24 +131,3 @@ def get_queue_details(token_data, interval):
         tuple: Queue details.
     """
     return get_redis_queue_layout()
-
-
-@app.callback(
-    Output('csv_list_store', 'data'),
-    [Input("token_data", "data")],
-    [State("app_data", "data")]
-)
-def create_samplesheets_details(token_data, app_data):
-    """
-    Generates the required samplesheet CSV files and returns as output:
-    - csv_list: list of created CSV filenames (excluding the pipeline_samplesheet).
-    """
-    if token_data:
-        csv_list = create_samplesheets(
-            token_data,
-            app_data,
-            output_file_pipeline_samplesheet="pipeline_samplesheet.csv"
-        )
-        return csv_list
-
-
