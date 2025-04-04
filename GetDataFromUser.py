@@ -113,7 +113,7 @@ app_specific_layout = dbc.Row(
 
 
 documentation_content = [
-    html.H2("Welcome to the Demultiplex App"),
+    html.H2("Welcome to the B-Fabric + NF-Core Demultiplex App"),
     html.P(
         "This demultiplex app is built on the redis_index.py template from the "
         "bfabric_web_app_templates repository. It streamlines the process of managing "
