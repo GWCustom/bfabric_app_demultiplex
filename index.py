@@ -16,10 +16,6 @@ import GetDataFromBfabric
 from generic.callbacks import app
 
 # Set configuration parameters for bfabric_web_apps.
-bfabric_web_apps.CONFIG_FILE_PATH = "~/.bfabricpy.yml"
-bfabric_web_apps.DEVELOPER_EMAIL_ADDRESS = "griffin@gwcustom.com"
-bfabric_web_apps.BUG_REPORT_EMAIL_ADDRESS = "gwtools@fgcz.system"
-bfabric_web_apps.debug = True
 
 
 # ---------------------------
