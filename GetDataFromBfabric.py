@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, "../bfabric-web-apps")
-
 import bfabric_web_apps
 from bfabric_web_apps.objects.BfabricInterface import bfabric_interface
 from sample_sheet import SampleSheet, Sample
@@ -40,7 +37,7 @@ def create_samplesheets_when_loading_app(token_data, app_data):
             output_file_pipeline_samplesheet="pipeline_samplesheet.csv"
         )
         L = bfabric_web_apps.get_logger(token_data)
-        L.log_operation("Samplesheets Created", f"Samplesheets successfully created: {', '.join(csv_list)} and {output_file}")
+        L.log_operation("Samplesheets Created | ORIGIN: demultiplex web app", f"Samplesheets successfully created: {', '.join(csv_list)} and {output_file}")
         return csv_list
 
 

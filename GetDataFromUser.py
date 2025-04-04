@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, "../bfabric-web-apps")
-
 import bfabric_web_apps
 from bfabric_web_apps.utils.redis_queue import q
 

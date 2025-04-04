@@ -4,10 +4,6 @@
 # and starts the web server.
 
 # Before running the application, ensure that bfabric_web_apps and bfabric_web_app_template are compatible!.
-
-import sys
-sys.path.insert(0, "../bfabric-web-apps")
-
 import os
 from dash import Input, Output, State
 import bfabric_web_apps
@@ -103,7 +99,7 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
     L = get_logger(token_data)
     try:
         # Log that the user has initiated the main job pipeline.
-        L.log_operation("Pipeline Info", "Job is started: User initiated main job pipeline.")
+        L.log_operation("Info | ORIGIN: demultiplex web app", "Job started: User initiated main job pipeline.")
         # 1. Update the selected lane CSV with the user edits.
         if lane_val:
             csv_path = csv_list[lane_val]
@@ -117,13 +113,13 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             # Key format: "./<filename>" (e.g., "./Samplesheet_lane_1.csv")
             key = f"./{os.path.basename(sheet_path)}"
             files_as_byte_strings[key] = read_file_as_bytes(sheet_path)
-            L.log_operation("Pipeline Info", f"File loaded: {key} loaded from {sheet_path}.")
+            L.log_operation("Info | ORIGIN: demultiplex web app", f"Created files as byte strings: {key} loaded from {sheet_path}.")
 
         # 3. Add the pipeline sample sheet and NFC_DMX configuration file.
         files_as_byte_strings["./pipeline_samplesheet.csv"] = read_file_as_bytes("./pipeline_samplesheet.csv")
-        L.log_operation("Pipeline Info", "Pipeline samplesheet loaded from ./pipeline_samplesheet.csv.")
+        L.log_operation("Info | ORIGIN: demultiplex web app", "Pipeline samplesheet loaded from ./pipeline_samplesheet.csv.")
         files_as_byte_strings["./NFC_DMX.config"] = read_file_as_bytes("./NFC_DMX.config")
-        L.log_operation("Pipeline Info", "NFC_DMX configuration loaded from ./NFC_DMX.config.")
+        L.log_operation("Info | ORIGIN: demultiplex web app", "NFC_DMX configuration loaded from ./NFC_DMX.config.")
 
         # Define the output directory for the pipeline.
         base_dir = "/STORAGE/OUTPUT_TEST"
@@ -145,12 +141,12 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 
         # 4. Create resource paths mapping file or folder to container IDs.
         resource_paths = create_resource_paths(token_data, base_dir)
-        L.log_operation("Pipeline Info", f"Resource paths created: {resource_paths}")
+        L.log_operation("Info | ORIGIN: demultiplex web app", f"Resource paths created: {resource_paths}")
         print("resource_paths", resource_paths)
 
         # Set attachment paths (e.g., for reports)
         attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
-        L.log_operation("Pipeline Info", "Attachment paths created: {attachment_paths}")
+        L.log_operation("Info | ORIGIN: demultiplex web app", f"Attachment paths created: {attachment_paths}")
 
         # 5. Enqueue the main job into the Redis queue for asynchronous execution.
         q(queue).enqueue(run_main_job, kwargs={
@@ -162,13 +158,13 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         })
       
         # Log that the job was submitted successfully.
-        L.log_operation("Pipeline Info", f"Job submitted successfully to {queue} Redis queue.")
+        L.log_operation("Info | ORIGIN: demultiplex web app", f"Job submitted successfully to {queue} Redis queue.")
         # Return success alert open, failure alert closed, no error message, and a success message.
         return True, False, "", "Job submitted successfully"
 
     except Exception as e:
         # Log that the job submission failed.
-        L.log_operation("Pipeline Info", f"Job submission failed: {str(e)}")
+        L.log_operation("Info | ORIGIN: demultiplex web app", f"Job submission failed: {str(e)}")
         # If an error occurs, return failure alert open with the error message.
         return False, True, f"Job submission failed: {str(e)}", "Job submission failed"
 
@@ -179,7 +175,7 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 if __name__ == "__main__":
     # Start the Dash web server.
     # The 'app' instance is provided by GetDataFromUser.py.
-    GetDataFromUser.app.run_server(
+    GetDataFromUser.app.run(
         debug=bfabric_web_apps.debug,
         port=bfabric_web_apps.PORT,
         host=bfabric_web_apps.HOST
