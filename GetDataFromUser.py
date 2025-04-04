@@ -114,6 +114,12 @@ app_specific_layout = dbc.Row(
 
 documentation_content = [
     html.H2("Welcome to the B-Fabric + NF-Core Demultiplex App"),
+    html.P("""
+        This app was built as a test-case for the integration between B-Fabric and NF-Core applications. It is meant to demonstrate the general applicability of the newest B-Fabric application framework, and all it's new capabilities. This app has not been sufficiently generalized to function with all short-read sequencing instruments, nor for each individual sequencing use-case. It should therefore be taken as a proof-of-concept, to demonstrate a genearlly the new generally applicable application framework validating an additional possible use-case for B-Fabric applications. 
+    """),
+    html.Br(), 
+    html.P("The underlying Nextflow / NF-Core workflow which is invoked by this web-app can be found here: https://nf-co.re/demultiplex/1.5.4/"),
+    html.Br(),
     html.P(
         "This demultiplex app is built on the redis_index.py template from the "
         "bfabric_web_app_templates repository. It streamlines the process of managing "
