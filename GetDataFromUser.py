@@ -38,12 +38,32 @@ sidebar = [
     dbc.Button('Submit', id='example-button'),
 ]
 
+# ------------------------------------------------------------------------------  
+# FGCZ Infrastructure Warning Alert  
+# ------------------------------------------------------------------------------  
+infra_warning_alert = dbc.Alert(
+    children=[
+        html.H5("Warning: This app does not run on FGCZ infrastructure.", className="alert-heading"),
+        html.P(
+            "It was built to demonstrate the generic B-Fabric web app framework. "
+            "Please check the in-app documentation tab for more information."
+        )
+    ],
+    color="warning",
+    is_open=True,
+    dismissable=False,
+    style={"margin": "20px"}
+)
+
+
+
 # ---------------------------
 # Main Layout Definition
 # ---------------------------
 app_specific_layout = dbc.Row(
     id="page-content-main",
     children=[
+        dbc.Col(html.Div([infra_warning_alert]), width=12),
         dcc.Loading(
             html.Div(
                 id="alerts-container",
