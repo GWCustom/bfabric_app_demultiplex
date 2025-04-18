@@ -172,7 +172,7 @@ if __name__ == "__main__":
     # Start the Dash web server.
     # The 'app' instance is provided by GetDataFromUser.py.
     GetDataFromUser.app.run(
-        debug=bfabric_web_apps.debug,
+        debug=bfabric_web_apps.DEBUG,
         port=bfabric_web_apps.PORT,
         host=bfabric_web_apps.HOST
     )
