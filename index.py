@@ -36,11 +36,12 @@ from generic.callbacks import app
         State('samplesheet-table', "data"),
         State('samplesheet-table', "selected_rows"),
         State("lane-dropdown", "value"),
-        State("csv_list_store", "data")
+        State("csv_list_store", "data"),
+        State("charge_run", "on"),
     ],
     prevent_initial_call=True
 )
-def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, lane_val, csv_list):
+def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, selected_rows, lane_val, csv_list, charge_run):
     """
     Callback to run the main job pipeline asynchronously when the "Submit" button is clicked.
     
@@ -85,7 +86,8 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         selected_rows (list): List of indices indicating which rows in the samplesheet table are selected.
         lane_val (int or str): Identifier for the selected lane (used to pick the correct CSV file from csv_list).
         csv_list (list): List mapping lane identifiers to their corresponding CSV file paths.
-    
+        charge_run (bool): Flag indicating whether the job should be charged to the user.
+        
     Returns:
             - (bool) Success alert state: True if the job was submitted successfully.
             - (bool) Failure alert state: True if the job submission failed.
@@ -144,13 +146,21 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
         L.log_operation("Info | ORIGIN: demultiplex web app", f"Attachment paths created: {attachment_paths}")
 
+        projects = [2220] # Example project IDs to charge the run to.
+
+        if charge_run: 
+            projects_to_charge = projects
+        else: 
+            projects_to_charge = []
+
         # 5. Enqueue the main job into the Redis queue for asynchronous execution.
         q(queue).enqueue(run_main_job, kwargs={
             "files_as_byte_strings": files_as_byte_strings,
             "bash_commands": bash_commands,
             "resource_paths": resource_paths,
             "attachment_paths": attachment_paths,
-            "token": url_params
+            "token": url_params,
+            "charge": projects_to_charge
         })
       
         # Log that the job was submitted successfully.

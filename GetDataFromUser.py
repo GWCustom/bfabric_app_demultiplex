@@ -17,7 +17,7 @@ from GetDataFromBfabric import load_samplesheet_data_when_loading_app, parse_sam
 # Sidebar Components: Lane Dropdown, Queue Selection Dropdown, and Submit Button (Run Main Job)
 # ------------------------------------------------------------------------------
 
-sidebar = [
+sidebar = bfabric_web_apps.components.charge_switch + [
     html.P("Select Lane:"),  # Label for lane selection
     dcc.Dropdown(
         id="lane-dropdown",
