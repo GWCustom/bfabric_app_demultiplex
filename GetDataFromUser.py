@@ -10,7 +10,6 @@ from generic.callbacks import app
 from generic.components import no_auth
 
 import os
-from ExecuteRunMainJob import create_resource_paths
 from GetDataFromBfabric import load_samplesheet_data_when_loading_app, parse_samplesheet_data_only
 
 # ------------------------------------------------------------------------------

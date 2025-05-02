@@ -11,7 +11,7 @@ from bfabric_web_apps import run_main_job, get_logger, read_file_as_bytes
 from bfabric_web_apps.utils.redis_queue import q
 import GetDataFromUser
 from GetDataFromUser import update_csv_based_on_ui
-from ExecuteRunMainJob import create_resource_paths
+from ExecuteRunMainJob import create_resource_paths_and_dataset
 import GetDataFromBfabric
 from generic.callbacks import app
 
@@ -63,9 +63,10 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
          Creates a list of bash command strings that are used to run the nf-core demultiplex pipeline 
          via Nextflow.
       
-      4. **Create Resource Paths:**  
-         Uses `create_resource_paths` to map file paths or directories to container IDs based on the
-         provided token data and the designated output directory.
+      4. **Create Resource Paths and Dataset dictionary:**  
+         Uses `create_resource_paths_and_dataset` to map file paths or directories to container IDs based on the
+         provided token data and the designated output directory. Here we also create a dataset dictionary
+         that maps container IDs to their respective datasets to be created. 
       
       5. **Enqueue the Job:**  
          The main job is enqueued for asynchronous processing via a Redis queue. The job is submitted 
@@ -134,11 +135,11 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             --demultiplexer bcl2fastq \
             --skip_tools samshee,checkqc \
             -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
-            -r 1.5.4 > {base_dir}/nextflow.log 2>&1"""
+            -r 1.5.4 > {base_dir}/nextflow.log"""
         ]
 
         # 4. Create resource paths mapping file or folder to container IDs.
-        resource_paths = create_resource_paths(token_data, base_dir)
+        resource_paths, dataset_dict = create_resource_paths_and_dataset(token_data, base_dir)
         L.log_operation("Info | ORIGIN: demultiplex web app", f"Resource paths created: {resource_paths}")
         print("resource_paths", resource_paths)
 
@@ -146,7 +147,7 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
         L.log_operation("Info | ORIGIN: demultiplex web app", f"Attachment paths created: {attachment_paths}")
 
-        projects = [2220] # Example project IDs to charge the run to.
+        projects = list(set(resource_paths.values()))
 
         if charge_run: 
             projects_to_charge = projects
@@ -160,9 +161,10 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             "resource_paths": resource_paths,
             "attachment_paths": attachment_paths,
             "token": url_params,
-            "charge": projects_to_charge
+            "charge": projects_to_charge,
+            "dataset_dict": dataset_dict
         })
-      
+
         # Log that the job was submitted successfully.
         L.log_operation("Info | ORIGIN: demultiplex web app", f"Job submitted successfully to {queue} Redis queue.")
         # Return success alert open, failure alert closed, no error message, and a success message.
@@ -180,6 +182,7 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 # ---------------------------
 if __name__ == "__main__":
     # Start the Dash web server.
+    print("Starting the web server...")
     # The 'app' instance is provided by GetDataFromUser.py.
     GetDataFromUser.app.run(
         debug=bfabric_web_apps.DEBUG,
