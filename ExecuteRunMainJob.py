@@ -5,9 +5,10 @@ import pandas as pd
 # ---------------------------
 # Resource Path Construction
 # ---------------------------
-def create_resource_paths(token_data, base_dir):
+def create_resource_paths_and_dataset(token_data, base_dir):
     """
     Constructs a dictionary mapping resource file paths to container IDs using pipeline and sample CSV data.
+    Additionally, creates the dataset dictionary for the resulting dataset object. 
 
     Process:
       - Reads pipeline_samplesheet.csv to obtain pipeline rows.
@@ -27,11 +28,20 @@ def create_resource_paths(token_data, base_dir):
         base_dir (str): Base directory where the resource files will be stored.
 
     Returns:
-        dict: A dictionary where keys are resource file paths and values are the corresponding container IDs.
+        A Tuple containing:
+            dict: A dictionary where keys are resource file paths and values are the corresponding container IDs.
               For example:
               {
                   "/STORAGE/OUTPUT/12345/L001/ContainerA/1001/SampleName_S1_L001_R1_001.fastq.gz": "ContainerID",
               }
+            dict: A dataset dictionary where keys are container IDs and values are dataset dictionaries.
+                For example:
+                {
+                    "ContainerID": {
+                        "Sample": ["SampleName_S1_L001_R1_001.fastq.gz", ...],
+                        ...
+                    },
+                }
     """
     resource_paths = {}
 
@@ -56,6 +66,13 @@ def create_resource_paths(token_data, base_dir):
         # Parse the samples CSV file to obtain sample metadata.
         samples = parse_samples_csv(samplesheet_basename)
 
+        # Initialize entries for the dataset dictionary.
+        sample_names = []
+        r1 = []
+        r2 = []
+        strandenesses = []
+        container_ids = []
+
         # Enumerate samples to assign sample order (S1, S2, ...).
         for idx, sample in enumerate(samples, start=1):
             sample_id = sample["Sample_ID"]
@@ -71,7 +88,32 @@ def create_resource_paths(token_data, base_dir):
                 full_path = f"{base_dir}/{pipeline_id}/{lane_str}/{container_id}/{sample_id}/{file_name}"
                 resource_paths[full_path] = container_id
 
-    return resource_paths
+                if read == "R1":
+                    r1.append(full_path)
+                else:
+                    r2.append(full_path)
+                    sample_names.append(sample_name)
+                    strandenesses.append("auto") 
+                    container_ids.append(container_id)
+    
+    dataset_dict = {}
+
+    for container_id in set(container_ids):
+        # Create a dataset dictionary for each container_id.
+        dataset_dict[str(container_id)] = {
+            "Sample": [],
+            "FASTQ Read 1": [],
+            "FASTQ Read 2": [],
+            "Strandedness": []
+        }
+
+    for i, container_id in enumerate(container_ids):
+        dataset_dict[str(container_id)]['Sample'].append(sample_names[i])
+        dataset_dict[str(container_id)]['FASTQ Read 1'].append(r1[i])
+        dataset_dict[str(container_id)]['FASTQ Read 2'].append(r2[i])
+        dataset_dict[str(container_id)]['Strandedness'].append(strandenesses[i])
+
+    return resource_paths, dataset_dict
 
 
 # ---------------------------

@@ -10,14 +10,13 @@ from generic.callbacks import app
 from generic.components import no_auth
 
 import os
-from ExecuteRunMainJob import create_resource_paths
 from GetDataFromBfabric import load_samplesheet_data_when_loading_app, parse_samplesheet_data_only
 
 # ------------------------------------------------------------------------------
 # Sidebar Components: Lane Dropdown, Queue Selection Dropdown, and Submit Button (Run Main Job)
 # ------------------------------------------------------------------------------
 
-sidebar = [
+sidebar = bfabric_web_apps.components.charge_switch + [
     html.P("Select Lane:"),  # Label for lane selection
     dcc.Dropdown(
         id="lane-dropdown",
@@ -38,12 +37,32 @@ sidebar = [
     dbc.Button('Submit', id='example-button'),
 ]
 
+# ------------------------------------------------------------------------------  
+# FGCZ Infrastructure Warning Alert  
+# ------------------------------------------------------------------------------  
+infra_warning_alert = dbc.Alert(
+    children=[
+        html.H5("Warning: This app does not run on FGCZ infrastructure.", className="alert-heading"),
+        html.P(
+            "It was built to demonstrate the generic B-Fabric web app framework. "
+            "Please check the in-app documentation tab for more information."
+        )
+    ],
+    color="warning",
+    is_open=True,
+    dismissable=False,
+    style={"margin": "20px"}
+)
+
+
+
 # ---------------------------
 # Main Layout Definition
 # ---------------------------
 app_specific_layout = dbc.Row(
     id="page-content-main",
     children=[
+        dbc.Col(html.Div([infra_warning_alert]), width=12),
         dcc.Loading(
             html.Div(
                 id="alerts-container",
@@ -113,43 +132,80 @@ app_specific_layout = dbc.Row(
 
 
 documentation_content = [
-    html.H2("Welcome to the B-Fabric + NF-Core Demultiplex App"),
+    html.H2("B-Fabric + NF-Core Demultiplex App Documentation", style={"margin-top": "20px", "margin-bottom": "20px"}),
     html.P("""
         This app was built as a test-case for the integration between B-Fabric and NF-Core applications. It is meant to demonstrate the general applicability of the newest B-Fabric application framework, and all it's new capabilities. This app has not been sufficiently generalized to function with all short-read sequencing instruments, nor for each individual sequencing use-case. It should therefore be taken as a proof-of-concept, to demonstrate a genearlly the new generally applicable application framework validating an additional possible use-case for B-Fabric applications. 
     """),
+    html.Br(),
+    html.P([
+        "The underlying Nextflow / NF-Core workflow which is invoked by this web-app can be found ",
+        html.A("here", href="https://nf-co.re/demultiplex/1.5.4/", target="_blank"),
+        ". This workflow implementation invokes the following sub-modules under the hood, which are invoked after this web-app creates the samplesheet: ",
+    ]),
+    html.Ul([
+        html.Li("checkqc"), 
+        html.Li("bcl2fastq (demultiplexing)"),
+        html.Li("kraken"),
+        html.Li("falco"),
+        html.Li("fastp"),
+        html.Li("md5sum"),
+        html.Li("multiqc"),
+    ]),
+    html.Br(),
+    html.P([
+        "An overview of the full NF-core pipeline can be seen below: "
+    ]),
     html.Br(), 
-    html.P("The underlying Nextflow / NF-Core workflow which is invoked by this web-app can be found here: https://nf-co.re/demultiplex/1.5.4/"),
+    html.Img(src="https://github.com/nf-core/demultiplex/raw/master/docs/demultiplex.png", style={"width": "100%", "maxWidth": "1000px", "marginBottom": "20px"}),
     html.Br(),
-    html.P(
-        "This demultiplex app is built on the redis_index.py template from the "
-        "bfabric_web_app_templates repository. It streamlines the process of managing "
-        "and executing Nextflow pipelines for demultiplexing tasks."
-    ),
+    html.P([
+        "This demultiplex app is built on the ",
+        html.A("redis_index.py", href="https://github.com/GWCustom/bfabric-web-app-template/blob/main/index_redis.py", target="_blank"),
+        " template from the ",
+        html.A("bfabric-web-app-template", href="https://github.com/GWCustom/bfabric-web-app-template", target="_blank"),
+        " repository. It streamlines the process of managing and executing Nextflow pipelines for demultiplexing tasks."
+    ]),
     html.Br(),
+    html.H4("Architecture Overview"),
+    html.Img(src="https://i.imgur.com/JgOI3Xx.jpeg", style={"width": "100%", "maxWidth": "1000px", "marginBottom": "20px"}),
+    html.P("""
+        The Demultiplex app follows a three-tier architecture involving a local UI server, a compute server,
+        and the B-Fabric system at FGCZ. Users interact with the Dash-based web app hosted on the Local GWC Server.
+        Submitted jobs are sent to the GWC Compute Server via Redis, where the core job function run_main_job()
+        executes the NF-Core Demultiplex pipeline. Pipeline output is stored locally and registered in B-Fabric as
+        linked resources and attachments using the B-Fabric API.
+    """),
+    html.Br(),
+html.Br(),
     html.H4("1. Bfabric Integration"),
-    html.P(
-        "The GetDataFromBfabric.py module is responsible for all API interactions with Bfabric. "
+    html.P([
+        "The ",
+        html.A("GetDataFromBfabric.py", href="https://github.com/GWCustom/bfabric_app_demultiplex/blob/main/GetDataFromBfabric.py", target="_blank"),
+        " module is responsible for all API interactions with Bfabric. "
         "It retrieves necessary metadata and sample information, and creates the samplesheets required "
         "to run the Nextflow pipeline."
-    ),
+    ]),
     html.Br(),
     html.H4("2. User Interface"),
-    html.P(
-        "The GetDataFromUser.py module provides a user-friendly interface that allows users to view, edit, "
+    html.P([
+        "The ",
+        html.A("GetDataFromUser.py", href="https://github.com/GWCustom/bfabric_app_demultiplex/blob/main/GetDataFromUser.py", target="_blank"),
+        " module provides a user-friendly interface that allows users to view, edit, "
         "and manage the samplesheets. Users can alter sample details, change entries, or delete them, ensuring "
         "that the samplesheet data is accurate before pipeline execution."
-    ),
+    ]),
     html.Br(),
     html.H4("3. Execution of the Main Job"),
-    html.P(
-        "The ExecuteRunMainJob.py module contains the helper functions and logic to run the main job pipeline. "
+    html.P([
+        "The ",
+        html.A("ExecuteRunMainJob.py", href="https://github.com/GWCustom/bfabric_app_demultiplex/blob/main/ExecuteRunMainJob.py", target="_blank"),
+        " module contains the helper functions and logic to run the main job pipeline. "
         "It manages bash command execution, resource path creation, and job queuing via Redis, facilitating "
         "asynchronous processing of the demultiplexing workflow."
-    ),
+    ]),
     html.Br(),
     html.P(
-        "Together, these three parts—Bfabric integration, a comprehensive user interface, and robust job execution—"
-        "form a cohesive system designed to support efficient demultiplexing workflows."
+        "Together, these three parts demonstrate the capabilities, extensibility, and generality of the new B-Fabric web-app paradigm."
     )
 ]
 
