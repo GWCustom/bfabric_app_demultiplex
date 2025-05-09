@@ -61,7 +61,7 @@ The app follows a three-tier design:
 - **Compute Server** – Executes the Nextflow pipeline via Redis
 - **B-Fabric** – LIMS integration for metadata and result registration
 
-![Architecture Diagram](https://i.imgur.com/JgOI3Xx.jpeg)
+![Architecture Diagram](https://i.imgur.com/OIadSYC.jpeg)
 
 ---
 
