@@ -92,45 +92,45 @@ The app follows a three-tier design:
 
 ### 1. Clone the Repository
 
-%%%bash
+```bash
 git clone https://github.com/GWCustom/bfabric_app_demultiplex.git
 cd bfabric_app_demultiplex
-%%%
+```
 
 ### 2. Create and Activate a Virtual Environment
 
 #### Using `virtualenv` (Linux/Mac):
 
-%%%bash
+```bash
 python3 -m venv venv
 source venv/bin/activate
-%%%
+```
 
 #### Using `virtualenv` (Windows):
 
-%%%bash
+```bash
 python -m venv venv
 venv\Scripts\activate
-%%%
+```
 
 #### Or use `conda`:
 
-%%%bash
+```bash
 conda create -n demultiplex-app pip
 conda activate demultiplex-app
-%%%
+```
 
 ### 3. Install Dependencies
 
-%%%bash
+```bash
 pip install -r requirements.txt
-%%%
+```
 
 ### 4. Set Up `.bfabricpy.yml`
 
 Place this config file in your home directory (`~/.bfabricpy.yml`):
 
-%%%yaml
+```yaml
 GENERAL:
   default_config: PRODUCTION
 
@@ -138,13 +138,13 @@ PRODUCTION:
   login: your_username
   password: your_password
   base_url: https://your-bfabric-api-endpoint
-%%%
+```
 
 ### 5. Run the App
 
-%%%bash
+```bash
 python3 redis_index.py
-%%%
+```
 
 Then open [http://localhost:8050](http://localhost:8050) in your browser.
 
