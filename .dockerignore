@@ -1,0 +1,46 @@
+# VCS
+.git
+.gitignore
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+venv/
+.dist/
+build/
+*.egg
+
+# Env / secrets (compose will still read .env locally; we just don't send it to the build context)
+.env
+
+# Nextflow runtime junk
+.nextflow/
+.nextflow.log
+.nextflow.log.*
+work/
+.cache/
+*.report
+*.trace
+*.timeline.html
+*.dag.svg
+
+# Logs
+*.log
+logs/
+*.out
+*.err
+
+# Docker
+.dockerignore
+docker-compose.yml
+
+# Misc
+*.ipynb_checkpoints

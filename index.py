@@ -107,44 +107,49 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         # 2. Prepare the final dictionary of files as byte strings.
         files_as_byte_strings = {}
 
+
+        # Define base, outut directory paths and Nextflow binary location.
+        base_dir = "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"
+        output_dir = "/home/azureuser/STORAGE/OUTPUT_TEST"
+        NEXTFLOW_BIN = "/home/azureuser/.local/bin/nextflow"
+
         # Loop through all lane sample sheets and add them to the dictionary.
         for sheet_path in csv_list:
             # Key format: "./<filename>" (e.g., "./Samplesheet_lane_1.csv")
-            key = f"./{os.path.basename(sheet_path)}"
+            key = f"{base_dir}{os.path.basename(sheet_path)}"
             files_as_byte_strings[key] = read_file_as_bytes(sheet_path)
             L.log_operation("Info | ORIGIN: demultiplex web app", f"Created files as byte strings: {key} loaded from {sheet_path}.")
 
         # 3. Add the pipeline sample sheet and NFC_DMX configuration file.
-        files_as_byte_strings["./pipeline_samplesheet.csv"] = read_file_as_bytes("./pipeline_samplesheet.csv")
+        files_as_byte_strings[f"{base_dir}pipeline_samplesheet.csv"] = read_file_as_bytes("./pipeline_samplesheet.csv")
         L.log_operation("Info | ORIGIN: demultiplex web app", "Pipeline samplesheet loaded from ./pipeline_samplesheet.csv.")
-        files_as_byte_strings["./NFC_DMX.config"] = read_file_as_bytes("./NFC_DMX.config")
+        files_as_byte_strings[f"{base_dir}NFC_DMX.config"] = read_file_as_bytes("./NFC_DMX.config")
         L.log_operation("Info | ORIGIN: demultiplex web app", "NFC_DMX configuration loaded from ./NFC_DMX.config.")
 
-        # Define the output directory for the pipeline.
-        base_dir = "/STORAGE/OUTPUT_TEST"
+
 
         # Construct the bash command to run the nf-core demultiplex pipeline.
         bash_commands = [
 
-            "rm -rf /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/work"
+            f"rm -rf {base_dir}work"
             ,
-            f"""/home/nfc/.local/bin/nextflow run nf-core/demultiplex \
+            f"""{NEXTFLOW_BIN} run nf-core/demultiplex \
             -profile docker \
-            --input /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/pipeline_samplesheet.csv \
-            --outdir {base_dir} \
+            --input {base_dir}pipeline_samplesheet.csv \
+            --outdir {output_dir} \
             --demultiplexer bcl2fastq \
             --skip_tools samshee,checkqc \
-            -c /APPLICATION/200611_A00789R_0071_BHHVCCDRXX/NFC_DMX.config \
-            -r 1.5.4 > {base_dir}/nextflow.log"""
+            -c {base_dir}NFC_DMX.config \
+            -r 1.5.4 > {output_dir}/nextflow.log"""
         ]
 
         # 4. Create resource paths mapping file or folder to container IDs.
-        resource_paths, dataset_dict = create_resource_paths_and_dataset(token_data, base_dir)
+        resource_paths, dataset_dict = create_resource_paths_and_dataset(token_data, output_dir)
         L.log_operation("Info | ORIGIN: demultiplex web app", f"Resource paths created: {resource_paths}")
         print("resource_paths", resource_paths)
 
         # Set attachment paths (e.g., for reports)
-        attachment_paths = {"/STORAGE/OUTPUT_TEST/multiqc/multiqc_report.html": "multiqc_report.html"}
+        attachment_paths = {f"{output_dir}/multiqc/multiqc_report.html": "multiqc_report.html"}
         L.log_operation("Info | ORIGIN: demultiplex web app", f"Attachment paths created: {attachment_paths}")
 
         projects = list(set(resource_paths.values()))

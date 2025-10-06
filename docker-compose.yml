@@ -1,0 +1,81 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: demux_redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [demuxnet]
+
+  web:
+    build: .
+    container_name: demux_web
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    command: ["python", "-u", "index.py"]
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "${WEB_PORT:-8050}"
+      DEBUG: "${DEBUG:-0}"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      BASE_DIR: "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"
+      OUTPUT_DIR: "/home/azureuser/STORAGE/OUTPUT_TEST"
+      NEXTFLOW_BIN: "/home/azureuser/.local/bin/nextflow"
+      NXF_HOME: "/workspace/.nextflow"
+    ports:
+      - "${WEB_PORT:-8050}:${WEB_PORT:-8050}"
+    volumes:
+      - .:/workspace
+      - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION
+      - /home/azureuser/STORAGE:/home/azureuser/STORAGE
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./ssh:/home/azureuser/.ssh:ro
+      - /home/azureuser/.bfabricpy.yml:/home/azureuser/.bfabricpy.yml:ro
+      - /home/azureuser/.ssh:/home/azureuser/.ssh:ro
+    working_dir: /workspace
+    networks: [demuxnet]
+
+  worker:
+    build: .
+    container_name: demux_worker
+    user: "0"    # Worker as root
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    command: ["python", "-u", "scripts/worker.py", "--queues=light,heavy"]
+    environment:
+      NXF_DOCKER_OPTS: "--user 0:0"
+      UID: "0"
+      GID: "0"
+
+      HOST: "0.0.0.0"
+      PORT: "${WEB_PORT:-8050}"
+      DEBUG: "${DEBUG:-0}"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      BASE_DIR: "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"
+      OUTPUT_DIR: "/home/azureuser/STORAGE/OUTPUT_TEST"
+      NEXTFLOW_BIN: "/home/azureuser/.local/bin/nextflow"
+      NXF_HOME: "/workspace/.nextflow"
+    volumes:
+      - .:/workspace
+      - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION
+      - /home/azureuser/STORAGE:/home/azureuser/STORAGE
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/azureuser/.bfabricpy.yml:/home/azureuser/.bfabricpy.yml:ro
+      - /home/azureuser/.bfabricpy.yml:/root/.bfabricpy.yml:ro
+      - /home/azureuser/.ssh:/home/azureuser/.ssh:ro
+      - /home/azureuser/.ssh:/root/.ssh:ro
+    working_dir: /workspace
+    networks: [demuxnet]
+
+networks:
+  demuxnet:
+    driver: bridge

@@ -140,13 +140,205 @@ PRODUCTION:
   base_url: https://your-bfabric-api-endpoint
 ```
 
-### 5. Run the App
+### 5. Create Your `.env` File
+
+The app uses a `.env` file to store environment variables required for running nextflow.
+An example file (`.env.example`) is included in the repository.
+
+Create your own `.env` file by copying the example:
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` in a text editor and adjust the values to match your environment.
+
+### 6. Run the App
 
 ```bash
 python3 redis_index.py
 ```
 
 Then open [http://localhost:8050](http://localhost:8050) in your browser.
+
+---
+
+## Docker Deployment
+
+You can deploy the **Demultiplex App** using Docker Compose, which automatically sets up all required services.
+
+---
+
+### 1. Clone the Repository
+
+If you haven’t already:
+
+```bash
+git clone https://github.com/GWCustom/bfabric_app_demultiplex.git
+cd bfabric_app_demultiplex
+```
+
+---
+
+### 2. Configure `.bfabricpy.yml`
+
+Before launching the containers, ensure you have your B-Fabric API credentials configured in `~/.bfabricpy.yml`:
+
+```yaml
+GENERAL:
+  default_config: PRODUCTION
+
+PRODUCTION:
+  login: your_username
+  password: your_password
+  base_url: https://your-bfabric-api-endpoint
+```
+
+> This file is mounted read-only into the containers.
+
+---
+
+### 3. Create Your `.env` File
+
+The app uses a `.env` file to store environment variables required by Docker Compose.
+An example file (`.env.example`) is included in the repository.
+
+Create your own `.env` file by copying the example:
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` in a text editor and adjust the values to match your environment.
+
+> **Important:** Comment out the `REDIS_HOST` line so the app can connect to the Redis service correctly within Docker Compose.
+> When Redis runs as part of the same Compose network, it is automatically reachable via the service name `redis`.
+
+---
+
+### 4. Review and Adjust Configuration Files
+
+Before running the containers, you must **update file paths and settings** in four places to match your environment.
+These paths point to local folders, users, and binaries that must exist on your server.
+
+---
+
+#### **A. `index.py`**
+
+In `index.py`, there are **three paths** that need to be updated.
+Replace each of these with the **correct paths on your server**, ensuring:
+
+* `base_dir` points to the main project directory containing your sample sheets
+* `output_dir` points to the folder where you want to save pipeline outputs
+* `NEXTFLOW_BIN` points to the Nextflow executable inside the container
+
+> Make sure these paths are consistent with the volumes you mount in your `docker-compose.yml`.
+
+---
+
+#### **B. `NFC_DMX.config`**
+
+You also need to configure the **Nextflow configuration file** used by the pipeline: `NFC_DMX.config`.
+You **must adjust the `workDir` path** to match your local environment.
+
+Open the file `NFC_DMX.config` and locate the following line near the bottom:
+
+```groovy
+workDir = "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/work"
+```
+---
+
+#### **C. `Dockerfile`**
+
+In the `Dockerfile`, you can **adjust the user** if your environment requires a different username:
+
+```dockerfile
+RUN useradd -ms /bin/bash azureuser
+USER azureuser
+WORKDIR /workspace
+```
+
+If you change the username (e.g. from `azureuser` to `myuser`), make sure to update:
+
+* All path references (e.g. `/home/azureuser/...`)
+* The mounted paths in your `docker-compose.yml`
+
+> The user must have access to `/workspace`, the mounted folders, and the Nextflow binary.
+
+---
+
+#### **D. `docker-compose.yml`**
+
+Finally, review the `docker-compose.yml` and update all path-related entries under `environment:` and `volumes:`.
+
+Key environment variables to update:
+
+```yaml
+environment:
+  BASE_DIR: "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"
+  OUTPUT_DIR: "/home/azureuser/STORAGE/OUTPUT_TEST"
+  NEXTFLOW_BIN: "/home/azureuser/.local/bin/nextflow"
+  NXF_HOME: "/workspace/.nextflow"
+```
+
+Key volumes to update:
+
+```yaml
+volumes:
+  - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION
+  - /home/azureuser/STORAGE:/home/azureuser/STORAGE
+  - /home/azureuser/.bfabricpy.yml:/home/azureuser/.bfabricpy.yml:ro
+  - /home/azureuser/.ssh:/home/azureuser/.ssh:ro
+```
+
+> Make sure these paths exist on your host machine.
+> They must match the locations referenced in `index.py` and the environment variables above.
+
+---
+
+### 5. Build and Start the Containers
+
+#### **A. Build the Images**
+
+Run the following command to build all service images:
+
+```bash
+docker compose build
+```
+
+---
+
+#### **B. Start the Services**
+
+Once the build is complete, start all services:
+
+```bash
+docker compose up
+```
+
+---
+
+### 6. Access the App
+
+Once the containers are running, open your browser and navigate to:
+
+```
+http://localhost:8050
+```
+
+The Dash UI should now be live and connected to Redis.
+
+---
+
+### 7. Stop the Containers
+
+To stop all running containers:
+
+```bash
+docker compose down
+```
+
+> This stops and removes the containers but keeps volumes and images intact.
 
 ---
 
