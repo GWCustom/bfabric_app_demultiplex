@@ -165,6 +165,11 @@ Then open [http://localhost:8050](http://localhost:8050) in your browser.
 
 You can deploy the **Demultiplex App** using Docker Compose, which automatically sets up all required services.
 
+> **Security Note:**  
+> The `worker` container runs as **root** and mounts the **Docker socket**.  
+> This setup is required for Nextflow but grants the container **elevated privileges** on the host.  
+> Only use this configuration in **trusted environments**.
+
 ---
 
 ### 1. Clone the Repository
@@ -191,8 +196,6 @@ PRODUCTION:
   password: your_password
   base_url: https://your-bfabric-api-endpoint
 ```
-
-> This file is mounted read-only into the containers.
 
 ---
 
@@ -261,7 +264,6 @@ If you change the username (e.g. from `azureuser` to `myuser`), make sure to upd
 * All path references (e.g. `/home/azureuser/...`)
 * The mounted paths in your `docker-compose.yml`
 
-> The user must have access to `/workspace`, the mounted folders, and the Nextflow binary.
 
 ---
 
@@ -269,29 +271,21 @@ If you change the username (e.g. from `azureuser` to `myuser`), make sure to upd
 
 Finally, review the `docker-compose.yml` and update all path-related entries under `environment:` and `volumes:`.
 
-Key environment variables to update:
+Key volumes to update
 
-```yaml
-environment:
-  BASE_DIR: "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"
-  OUTPUT_DIR: "/home/azureuser/STORAGE/OUTPUT_TEST"
-  NEXTFLOW_BIN: "/home/azureuser/.local/bin/nextflow"
-  NXF_HOME: "/workspace/.nextflow"
-```
-
-Key volumes to update:
+Make sure the following mounted paths match your local environment.
+They define where the app reads input data, writes output results, and accesses credentials.
 
 ```yaml
 volumes:
-  - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION
-  - /home/azureuser/STORAGE:/home/azureuser/STORAGE
-  - /home/azureuser/.bfabricpy.yml:/home/azureuser/.bfabricpy.yml:ro
-  - /home/azureuser/.ssh:/home/azureuser/.ssh:ro
+  - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION    # Input directory
+  - /home/azureuser/STORAGE:/home/azureuser/STORAGE            # Output directory
+  - /home/azureuser/.bfabricpy.yml:/home/azureuser/.bfabricpy.yml:ro  # B-Fabric credentials
+  - /home/azureuser/.ssh:/home/azureuser/.ssh:ro               # SSH keys
+  - /home/azureuser/.ssh:/root/.ssh:ro
 ```
 
-> Make sure these paths exist on your host machine.
-> They must match the locations referenced in `index.py` and the environment variables above.
-
+> Make sure to adjust the paths in both the web and worker services.
 ---
 
 ### 5. Build and Start the Containers
