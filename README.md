@@ -271,7 +271,20 @@ If you change the username (e.g. from `azureuser` to `myuser`), make sure to upd
 
 Finally, review the `docker-compose.yml` and update all path-related entries under `environment:` and `volumes:`.
 
-Key volumes to update
+**Key environment variables to update**
+
+Make sure the following environment variables match your local environment.
+They define where the app reads input data, writes output results, and locates the Nextflow binary.
+
+```yaml
+environment:
+  BASE_DIR: "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"   # Input directory
+  OUTPUT_DIR: "/home/azureuser/STORAGE/OUTPUT_TEST"                         # Output directory
+  NEXTFLOW_BIN: "/home/azureuser/.local/bin/nextflow"                       # Path to Nextflow binary on the host
+  NXF_HOME: "/workspace/.nextflow"                                          # Nextflow cache directory inside the container
+```
+
+**Key volumes to update**
 
 Make sure the following mounted paths match your local environment.
 They define where the app reads input data, writes output results, and accesses credentials.
