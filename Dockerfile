@@ -54,7 +54,7 @@ WORKDIR /workspace
 # Add Nextflow to PATH and define the version to install
 # Adds ~/.local/bin to the PATH so commands there can be run; sets the Nextflow version variable.
 ENV PATH="/home/azureuser/.local/bin:${PATH}" \
-    NXF_VERSION=24.04.2
+    NXF_VER=25.04.7
 
 # ----------------------------------------------------------
 # Install Nextflow (workflow engine)
@@ -62,7 +62,7 @@ ENV PATH="/home/azureuser/.local/bin:${PATH}" \
 # Downloads the Nextflow binary, moves it into the user’s PATH,
 # and ensures it’s executable.
 # so you can run nextflow inside the container without root.
-RUN curl -sL https://get.nextflow.io | bash \
+RUN curl -fsSL https://get.nextflow.io | bash -s - -v ${NXF_VER} \
  && mkdir -p /home/azureuser/.local/bin \
  && mv nextflow /home/azureuser/.local/bin/nextflow \
  && chmod +x /home/azureuser/.local/bin/nextflow
