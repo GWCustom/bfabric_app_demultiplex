@@ -170,7 +170,6 @@ You can deploy the **Demultiplex App** using Docker Compose, which automatically
 > This setup is required for Nextflow but grants the container **elevated privileges** on the host.  
 > Only use this configuration in **trusted environments**.
 
----
 
 ### 1. Clone the Repository
 
@@ -181,7 +180,6 @@ git clone https://github.com/GWCustom/bfabric_app_demultiplex.git
 cd bfabric_app_demultiplex
 ```
 
----
 
 ### 2. Configure `.bfabricpy.yml`
 
@@ -197,7 +195,6 @@ PRODUCTION:
   base_url: https://your-bfabric-api-endpoint
 ```
 
----
 
 ### 3. Create Your `.env` File
 
@@ -215,14 +212,12 @@ Then open `.env` in a text editor and adjust the values to match your environmen
 > **Important:** Comment out the `REDIS_HOST` line so the app can connect to the Redis service correctly within Docker Compose.
 > When Redis runs as part of the same Compose network, it is automatically reachable via the service name `redis`.
 
----
 
 ### 4. Review and Adjust Configuration Files
 
 Before running the containers, you must **update file paths and settings** in four places to match your environment.
 These paths point to local folders, users, and binaries that must exist on your server.
 
----
 
 #### **A. `index.py`**
 
@@ -235,7 +230,6 @@ Replace each of these with the **correct paths on your server**, ensuring:
 
 > Make sure these paths are consistent with the volumes you mount in your `docker-compose.yml`.
 
----
 
 #### **B. `NFC_DMX.config`**
 
@@ -247,7 +241,6 @@ Open the file `NFC_DMX.config` and locate the following line near the bottom:
 ```groovy
 workDir = "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/work"
 ```
----
 
 #### **C. `Dockerfile`**
 
@@ -265,7 +258,6 @@ If you change the username (e.g. from `azureuser` to `myuser`), make sure to upd
 * The mounted paths in your `docker-compose.yml`
 
 
----
 
 #### **D. `docker-compose.yml`**
 
@@ -299,7 +291,6 @@ volumes:
 ```
 
 > Make sure to adjust the paths in both the web and worker services.
----
 
 ### 5. Build and Start the Containers
 
@@ -311,7 +302,6 @@ Run the following command to build all service images:
 docker compose build
 ```
 
----
 
 #### **B. Start the Services**
 
@@ -320,8 +310,6 @@ Once the build is complete, start all services:
 ```bash
 docker compose up
 ```
-
----
 
 ### 6. Access the App
 
@@ -332,8 +320,6 @@ http://localhost:8050
 ```
 
 The Dash UI should now be live and connected to Redis.
-
----
 
 ### 7. Stop the Containers
 
