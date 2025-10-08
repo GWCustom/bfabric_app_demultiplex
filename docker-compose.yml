@@ -1,23 +1,20 @@
-# redis = redis server
-# web = Dash web app
-# worker = redis worker runs Nextflow
-# demuxnet = a private network so the three can talk to each other
-
 services:
   redis:
     image: redis:7-alpine
-    container_name: demux_redis
+    container_name: rnaseq_redis
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
-    networks: [demuxnet]
+    networks: [rnaseqnet]
 
   web:
-    build: .
-    container_name: demux_web
+    build:
+      context: ..
+      dockerfile: bfabric_app_demultiplex/Dockerfile
+    container_name: rnaseq_web
     depends_on:
       redis:
         condition: service_healthy
@@ -25,72 +22,64 @@ services:
     command: ["python", "-u", "index.py"]
     environment:
       HOST: "0.0.0.0"
-      PORT: "${WEB_PORT:-8050}"
+      PORT: "${WEB_PORT:-8051}"
       DEBUG: "${DEBUG:-0}"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      BASE_DIR: "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"
+      BASE_DIR: "/home/azureuser/APPLICATION/temp_rnaseq_run"
     ports:
-      - "${WEB_PORT:-8050}:${WEB_PORT:-8050}"
+      - "${WEB_PORT:-8051}:${WEB_PORT:-8051}"
     volumes:
-      - .:/workspace                              # code + pipeline_samplesheet.csv + NFC_DMX.config
-      - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION  # lane CSVs
-      - /home/azureuser/.bfabricpy.yml:/home/azureuser/.bfabricpy.yml:ro  # B-Fabric config (likely needed)
+      # App-Code
+      - ../bfabric_app_demultiplex:/workspace
+      # Lokale Library als Vendor-Pfad für editable install
+      - ../bfabric-web-apps:/workspace/vendor/bfabric-web-apps
+      # Persistente Pfade/Configs
+      - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION
+      - /home/azureuser/.bfabricpy.yml:/home/azureuser/.bfabricpy.yml:ro
     working_dir: /workspace
-    networks: [demuxnet]
+    networks: [rnaseqnet]
 
-  # The worker runs as root and mounts the Docker socket.
-  # This combination grants full control over the host’s Docker daemon (root-equivalent access).
-  # It is required by Nextflow to handle file permissions and launch Dockerized processes.
   worker:
-    build: .
-    container_name: demux_worker
-    user: "0"    # run as root (needed for Nextflow & file permissions)
+    build:
+      context: ..
+      dockerfile: bfabric_app_demultiplex/Dockerfile
+    container_name: rnaseq_worker
+    user: "0"  # Nextflow/Permissions
     depends_on:
       redis:
         condition: service_healthy
     env_file: .env
     command: ["python", "-u", "scripts/worker.py", "--queues=light,heavy"]
     environment:
-      # --- Nextflow / Docker configuration ---
-      NXF_DOCKER_OPTS: "--user 0:0"     # run all docker containers inside Nextflow as root (avoid permission errors)
-      UID: "0"                          # user id
-      GID: "0"                          # group id
+      NXF_DOCKER_OPTS: "--user 0:0"
+      NEXTFLOW_BIN: "/home/azureuser/.local/bin/nextflow"
+      NXF_HOME: "/workspace/.nextflow"
+      UID: "0"
+      GID: "0"
 
-      # --- Redis connection ---
-      REDIS_HOST: "redis"               
-      REDIS_PORT: "6379"                
-
-      # --- Data paths ---
-      BASE_DIR: "/home/azureuser/APPLICATION/200611_A00789R_0071_BHHVCCDRXX/"  
-      OUTPUT_DIR: "/home/azureuser/STORAGE/OUTPUT_TEST"                         
-
-      # --- Nextflow binary & home ---
-      NEXTFLOW_BIN: "/home/azureuser/.local/bin/nextflow"  # location of nextflow executable inside container
-      NXF_HOME: "/workspace/.nextflow"                     # working/cache dir for Nextflow (inside container)
-
+      HOST: "0.0.0.0"
+      PORT: "${WEB_PORT:-8051}"
+      DEBUG: "${DEBUG:-0}"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      BASE_DIR: "/home/azureuser/APPLICATION/temp_rnaseq_run"
+      OUTPUT_DIR: "/home/azureuser/STORAGE"
     volumes:
-      # --- Project code & scripts ---
-      - .:/workspace                                     # mount your source code and pipeline configs (scripts, index.py, etc.)
-
-      # --- Input / Output data ---
-      - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION   
-      - /home/azureuser/STORAGE:/home/azureuser/STORAGE           
-
-      # --- Docker access ---
-      - /var/run/docker.sock:/var/run/docker.sock                # gives container access to host Docker daemon (Nextflow can spawn docker containers)
-
-      # --- B-Fabric configuration ---
-      - /home/azureuser/.bfabricpy.yml:/root/.bfabricpy.yml:ro            # worker runs as root, B-Fabric client expects config in home folder
-
-      # --- SSH keys
+      # App-Code
+      - ../bfabric_app_demultiplex:/workspace
+      # Lokale Library als Vendor-Pfad für editable install
+      - ../bfabric-web-apps:/workspace/vendor/bfabric-web-apps
+      # Persistente Pfade/Configs + Docker Socket für Nextflow
+      - /home/azureuser/APPLICATION:/home/azureuser/APPLICATION
+      - /home/azureuser/STORAGE:/home/azureuser/STORAGE
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/azureuser/.bfabricpy.yml:/root/.bfabricpy.yml:ro
       - /home/azureuser/.ssh:/home/azureuser/.ssh:ro
       - /home/azureuser/.ssh:/root/.ssh:ro
-
     working_dir: /workspace
-    networks: [demuxnet]
-
+    networks: [rnaseqnet]
 
 networks:
-  demuxnet:
+  rnaseqnet:
     driver: bridge

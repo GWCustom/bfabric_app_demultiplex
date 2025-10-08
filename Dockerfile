@@ -74,7 +74,8 @@ RUN curl -sL https://get.nextflow.io | bash \
 # temporarily switch to root.
 USER root
 # copy your requirements.txt and install all Python deps globally.
-COPY requirements.txt /workspace/requirements.txt
+COPY bfabric_app_demultiplex/requirements.txt /workspace/requirements.txt
+COPY bfabric-web-apps /workspace/vendor/bfabric-web-apps
 RUN pip install --no-cache-dir -r /workspace/requirements.txt
 
 # ----------------------------------------------------------

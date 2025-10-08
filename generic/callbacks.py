@@ -44,7 +44,8 @@ app = create_app()
         Output('app_data', 'data'),             # Store app data.
         Output('page-title', 'children'),       # Update page title.
         Output('session-details', 'children'),  # Update session details.
-        Output('dynamic-link', 'href')          # Directly update the button!
+        Output('dynamic-link', 'href'),          # Directly update the button!
+        Output('bfabric-entity-link', 'href'),  # B-Fabric Entity button href.
     ],
     [Input('url', 'search')]                    # Extract token from URL parameters.
 )
