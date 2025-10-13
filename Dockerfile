@@ -2,14 +2,8 @@
 FROM python:3.11-slim
 
 # ----------------------------------------------------------
-# Install system dependencies
+# System deps: Java (Nextflow), curl, git, openssh, gnupg, certs
 # ----------------------------------------------------------
-# Includes:
-# - Java runtime (required by Nextflow)
-# - Docker CLI (so Nextflow can launch containers via -profile docker)
-# - Git (used by Nextflow to pull pipelines)
-# - curl, ca-certificates, gnupg (for secure downloads)
-# - SSH client
 RUN apt-get update && apt-get install -y --no-install-recommends \
       openjdk-21-jre-headless \
       curl \
@@ -20,75 +14,58 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------------------------------------
-# Install Docker CLI (to allow Nextflow to run Docker containers)
+# (REMOVED) Docker-CLI – nicht mehr nötig
 # ----------------------------------------------------------
-# This sets up the official Docker repository and installs the CLI.
-# The container uses the host's Docker socket (/var/run/docker.sock)
-# to communicate with the host Docker daemon. (Docker-outside-of-Docker)
-# -m 0755 = make it readable by everyone, writable by root.
- # apt will use this key to verify Docker packages are real and safe.
-RUN install -m 0755 -d /etc/apt/keyrings \ 
- && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
- && chmod a+r /etc/apt/keyrings/docker.gpg \
- && . /etc/os-release \
- && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" \
-    > /etc/apt/sources.list.d/docker.list \
- && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli \
- && rm -rf /var/lib/apt/lists/*
+# ✂️ Den kompletten Block mit docker-ce-cli und keyrings entfernen
 
-# Create key folder → download Docker’s trust key → register Docker repo → update apt → install Docker CLI → clean up.
-
-
-
-# Create a non-root user (azureuser) for security and reproducibility
-# creates a new user called azureuser, gives them a home folder, and sets their shell to bash.
-# safer than running everything as root.
+# ----------------------------------------------------------
+# Non-root user
+# ----------------------------------------------------------
 RUN useradd -ms /bin/bash azureuser
-
-# Switch to the new user
 USER azureuser
-
-# Set working directory (this is where your code will run)
 WORKDIR /workspace
 
-# Add Nextflow to PATH and define the version to install
-# Adds ~/.local/bin to the PATH so commands there can be run; sets the Nextflow version variable.
+# ----------------------------------------------------------
+# Nextflow
+# ----------------------------------------------------------
 ENV PATH="/home/azureuser/.local/bin:${PATH}" \
-    NXF_VER=25.04.7
-
-# ----------------------------------------------------------
-# Install Nextflow (workflow engine)
-# ----------------------------------------------------------
-# Downloads the Nextflow binary, moves it into the user’s PATH,
-# and ensures it’s executable.
-# so you can run nextflow inside the container without root.
-RUN curl -fsSL https://get.nextflow.io | bash -s - -v ${NXF_VER} \
+    NXF_VERSION=24.04.2
+RUN curl -sL https://get.nextflow.io | bash \
  && mkdir -p /home/azureuser/.local/bin \
  && mv nextflow /home/azureuser/.local/bin/nextflow \
  && chmod +x /home/azureuser/.local/bin/nextflow
 
 # ----------------------------------------------------------
-# Install Python dependencies (as root)
+# Micromamba (Conda ohne Root) + Nextflow-Env-Variablen
 # ----------------------------------------------------------
-# Switch back to root to install Python packages globally.
-# temporarily switch to root.
 USER root
-# copy your requirements.txt and install all Python deps globally.
+RUN curl -L https://micro.mamba.pm/api/micromamba/linux-64/1.5.8 -o /usr/local/bin/micromamba \
+ && chmod +x /usr/local/bin/micromamba
+USER azureuser
+
+# Nextflow auf micromamba hinweisen + Caches in Workspace legen
+ENV NXF_MAMBA_CLI=micromamba \
+    NXF_CONDA_CACHEDIR=/workspace/.conda \
+    MAMBA_ROOT_PREFIX=/opt/micromamba
+# optional: Cache-Verzeichnisse anlegen (gehören azureuser)
+RUN mkdir -p /workspace/.conda
+
+# ----------------------------------------------------------
+# Python deps
+# ----------------------------------------------------------
+# ... vorher: USER root
+USER root
+
+# Wenn requirements.txt im Projektroot liegt:
 COPY requirements.txt /workspace/requirements.txt
+COPY bfabric-web-apps /workspace/vendor/bfabric-web-apps
+
 RUN pip install --no-cache-dir -r /workspace/requirements.txt
 
 # ----------------------------------------------------------
-# Copy project files (fallback code)
+# Project files (fallback) + Rechte
 # ----------------------------------------------------------
-# fallback copy so the image can run even without bind mounts (Compose will override this with .:/workspace).
-# The files copied here will be replaced at runtime if a bind mount is used
-# (e.g. via Docker Compose: `.:/workspace`)
+USER root
 COPY . /workspace
-
-# Fix permissions so the non-root user can access everything
-# So the non-root user can read/write the code and generated files.
 RUN chown -R azureuser:azureuser /workspace
-
-# Switch back to the non-root user
-# switch back to the safer non-root user for running the app.
 USER azureuser

@@ -130,17 +130,19 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
 
         # Construct the bash command to run the nf-core demultiplex pipeline.
         bash_commands = [
-
-            f"rm -rf {base_dir}work"
-            ,
-            f"""{NEXTFLOW_BIN} run nf-core/demultiplex \
-            -profile docker \
-            --input {base_dir}pipeline_samplesheet.csv \
-            --outdir {output_dir} \
-            --demultiplexer bcl2fastq \
+            f"""{NEXTFLOW_BIN} -log "{output_dir}/nextflow.log" run nf-core/demultiplex \
+            -r 1.5.4 \
+            -profile conda \
+            --input "{base_dir}pipeline_samplesheet.csv" \
+            --outdir "{output_dir}" \
+            --demultiplexer fqtk \
             --skip_tools samshee,checkqc \
-            -c {base_dir}NFC_DMX.config \
-            -r 1.5.4 > {output_dir}/nextflow.log"""
+            -c "{base_dir}NFC_DMX.config" \
+            -work-dir "{output_dir}/work"
+            -with-report "{output_dir}/report.html" \
+            -with-trace "{output_dir}/trace.txt" \
+            -with-timeline "{output_dir}/timeline.html"
+            """
         ]
 
         # 4. Create resource paths mapping file or folder to container IDs.
@@ -152,10 +154,11 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
         attachment_paths = {f"{output_dir}/multiqc/multiqc_report.html": "multiqc_report.html"}
         L.log_operation("Info | ORIGIN: demultiplex web app", f"Attachment paths created: {attachment_paths}")
 
-        projects = list(set(resource_paths.values()))
+        projects = [37767] #list(set(resource_paths.values()))
 
         if charge_run: 
             projects_to_charge = projects
+            print("projects_to_charge", projects_to_charge)
         else: 
             projects_to_charge = []
 
@@ -167,6 +170,7 @@ def run_main_job_callback(n_clicks, url_params, token_data, queue, table_data, s
             "attachment_paths": attachment_paths,
             "token": url_params,
             "charge": projects_to_charge,
+            "service_id":int(1),
             "dataset_dict": dataset_dict
         })
 
